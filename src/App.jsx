@@ -57,6 +57,10 @@ const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 0.52;  // 拉满约等于 130% 视野，界面仍显示 10%–100%
 const VIEWPORT_PADDING = 800;
 const GOOGLE_DRIVE_FOLDER_ID = '1Bfgu-mnON0dfQSEK33-GKOvMrpENx4bl';
+// Submit rule: cannot submit in template zone (45k–55k); can submit if <45k or 55k–70k; >70k cannot submit
+const BUDGET_ALLOCATION_SGD = 50000;
+const BUDGET_TOLERANCE = 0.1;   // 45k–55k = "template zone" (no submit)
+const BUDGET_MAX_SGD = 70000;   // hard cap: over 70k cannot submit
 // 注意：需要在 Google Cloud Console 配置 OAuth 2.0 凭据
 // 请将下面的值替换为您的实际 Google API 凭据
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_CLIENT_ID.apps.googleusercontent.com';
@@ -966,8 +970,25 @@ const App = () => {
     setTimeout(() => setUploadStatus(null), 2000);
   };
 
+  const budgetMinSGD = BUDGET_ALLOCATION_SGD * (1 - BUDGET_TOLERANCE);  // 45k
+  const budgetMaxSGD = BUDGET_ALLOCATION_SGD * (1 + BUDGET_TOLERANCE);  // 55k
+  const inTemplateZone = analysis.costSGD >= budgetMinSGD && analysis.costSGD <= budgetMaxSGD;
+  const overCap = analysis.costSGD > BUDGET_MAX_SGD;
+  const canSubmit = !inTemplateZone && !overCap;
+
   const submitToTeacher = async () => {
-    const apiUrl = import.meta.env.VITE_SUBMIT_API_URL || (typeof window !== 'undefined' ? window.location.origin + '/api/submit' : '');
+    if (!canSubmit) {
+      if (overCap) {
+        setUploadStatus(`Cannot submit. Total budget must not exceed ${(BUDGET_MAX_SGD / 1000).toFixed(0)},000 SGD. Your total: $${Math.round(analysis.costSGD).toLocaleString()} SGD.`);
+      } else {
+        setUploadStatus(`Cannot submit. Budget must be outside the allocation range (${(budgetMinSGD / 1000).toFixed(0)}k–${(budgetMaxSGD / 1000).toFixed(0)}k SGD) so your design reflects real choices. Adjust below ${(budgetMinSGD / 1000).toFixed(0)}k or above ${(budgetMaxSGD / 1000).toFixed(0)}k (max ${(BUDGET_MAX_SGD / 1000).toFixed(0)}k).`);
+      }
+      setTimeout(() => setUploadStatus(null), 6000);
+      return;
+    }
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const isProduction = origin && !origin.startsWith('http://localhost');
+    const apiUrl = isProduction ? origin + '/api/submit' : (import.meta.env.VITE_SUBMIT_API_URL || origin + '/api/submit');
     if (!apiUrl) {
       setUploadStatus('Submit URL not configured. Use Download JSON and send the file yourself.');
       setTimeout(() => setUploadStatus(null), 4000);
@@ -1200,12 +1221,13 @@ const App = () => {
               </button>
               <button
                 onClick={submitToTeacher}
-                disabled={isExporting}
+                disabled={isExporting || !canSubmit}
+                title={!canSubmit ? (overCap ? 'Budget must not exceed 70,000 SGD' : 'Submit allowed only when budget is under 45k or between 55k and 70k') : ''}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 ${
-                  isExporting ? 'bg-sky-600/50 text-white/50 cursor-not-allowed' : 'bg-sky-600 text-white hover:bg-sky-500'
+                  isExporting ? 'bg-sky-600/50 text-white/50 cursor-not-allowed' : !canSubmit ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-sky-600 text-white hover:bg-sky-500'
                 }`}
               >
-                <Download size={16} /> {isExporting ? 'Submitting…' : 'Submit'}
+                <Download size={16} /> {isExporting ? 'Submitting…' : canSubmit ? 'Submit' : 'Cannot submit'}
               </button>
               <button
                 onClick={exportData}
@@ -1351,6 +1373,12 @@ const App = () => {
                       <div className="flex items-center gap-1.5 mb-1"><DollarSign size={12} className="text-emerald-500" /><span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Budget (SGD)</span></div>
                       <div className="flex justify-between items-center bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
                         <span className="text-lg font-mono font-black text-emerald-400">${analysis.costSGD.toLocaleString()}</span>
+                      </div>
+                      <div className="text-[9px] text-slate-500">
+                        Submit allowed: under {(budgetMinSGD / 1000).toFixed(0)}k or {(budgetMaxSGD / 1000).toFixed(0)}k–{(BUDGET_MAX_SGD / 1000).toFixed(0)}k SGD (45k–55k = template zone, no submit)
+                      </div>
+                      <div className={`text-[10px] font-bold ${canSubmit ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {canSubmit ? 'Within allowed range — submit enabled' : overCap ? 'Over 70k cap — cannot submit' : 'In template zone (45k–55k) — cannot submit'}
                       </div>
                     </div>
                   </div>

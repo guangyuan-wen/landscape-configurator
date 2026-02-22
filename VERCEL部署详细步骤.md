@@ -68,10 +68,12 @@
 4. **Build and Output Settings** 一般不用改，默认类似：
    - Build Command: `npm run build`
    - Output Directory: `dist`
-5. **环境变量（必填，否则 Google 上传用不了）**：
-   - 在 **“Environment Variables”** 区域，**Key** 填：`VITE_GOOGLE_CLIENT_ID`
-   - **Value** 填：你的 Google OAuth 客户端 ID（和本地 `.env` 里那个一样，形如 `539234925956-xxxxx.apps.googleusercontent.com`）。
-   - 填好后点 **“Add”** 或旁边加号，确保列表里有一条 `VITE_GOOGLE_CLIENT_ID`。
+5. **环境变量**（必填项）：
+   - **Google 上传**：**Key** 填 `VITE_GOOGLE_CLIENT_ID`，**Value** 填你的 Google OAuth 客户端 ID（形如 `539234925956-xxxxx.apps.googleusercontent.com`），点 **Add**。
+   - **Submit 发邮件**（“提交给老师”）：必须再加两条，否则点 Submit 会报 “Server not configured”：
+     - **Key**：`RESEND_API_KEY`，**Value**：在 https://resend.com 创建的 API Key（以 `re_` 开头）。
+     - **Key**：`TEACHER_EMAIL`，**Value**：**接收作业的邮箱**（填你自己的邮箱即可，例如 `你的名字@gmail.com`）。
+   - 填好后列表中应有：`VITE_GOOGLE_CLIENT_ID`、`RESEND_API_KEY`、`TEACHER_EMAIL`。
 6. 检查一遍上面几项，然后点页面下方的 **“Deploy”**。
 
 ### 2.4 等待部署完成
@@ -132,5 +134,6 @@
 - **部署失败、报错**：在 Vercel 项目里点 **“Deployments”** → 点失败的那次 → 看 **“Building”** 里的日志，把红色报错复制下来，便于排查（或发给我）。
 - **打开链接是空白**：先看浏览器控制台（F12）有没有报错；再确认环境变量 `VITE_GOOGLE_CLIENT_ID` 在 Vercel 里已填对，并**重新部署**一次。
 - **Google 上传提示未授权**：检查 Google Cloud 里“已授权的 JavaScript 源”是否包含你的 `https://xxx.vercel.app`，且没有多余斜杠或 http。
+- **Submit 报错 “Server not configured: set RESEND_API_KEY and TEACHER_EMAIL”**：在 Vercel 项目 **Settings → Environment Variables** 里添加 `RESEND_API_KEY`（Resend 的 API Key）和 `TEACHER_EMAIL`（你的收件邮箱），保存后到 **Deployments** 里点 **Redeploy** 再试。部署后前端会自动用当前网站地址（如 `https://landscape-configurator.vercel.app`）调用 `/api/submit`，无需再填本地地址。
 
 按上面步骤做完，你就有一个**固定的、可分享的公网链接**，并且以后改代码只要 `git push` 就会自动更新，不需要重新“再部署一次”才能改。
