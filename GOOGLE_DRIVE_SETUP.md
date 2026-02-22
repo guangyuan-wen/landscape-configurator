@@ -26,8 +26,18 @@
 4. 创建 OAuth 客户端 ID：
    - 应用类型：选择 "Web 应用"
    - 名称：Landscape Configurator
-   - 已授权的 JavaScript 源：添加 `http://localhost:5173`（开发环境）
-   - 已授权的重定向 URI：添加 `http://localhost:5173`
+   - **已授权的 JavaScript 源**：逐条添加（开发时可能用不同端口，建议都加）：
+     - `http://localhost:5173`
+     - `http://localhost:5174`
+     - `http://localhost:5175`
+     - 若已部署，再添加：`https://你的项目.vercel.app`
+   - **已授权的重定向 URI**：添加与上面**完全一致**的地址（含末尾斜杠也建议加一条）：
+     - `http://localhost:5173`
+     - `http://localhost:5173/`
+     - `http://localhost:5174`
+     - `http://localhost:5175`
+     - `https://你的项目.vercel.app`
+     - `https://你的项目.vercel.app/`
 5. 点击 "创建"，复制生成的 **客户端 ID**
 
 ### 3. 配置环境变量
@@ -76,14 +86,29 @@ npm run dev
 
 应用在“测试”模式下只能由这里添加的测试用户登录；添加后无需等待审核，立即可用。
 
+## 解决「错误 400: redirect_uri_mismatch」
+
+若登录时出现 **“禁止访问: 此应用的请求无效”** 或 **“Error 400: redirect_uri_mismatch”**：
+
+1. 打开 [Google Cloud Console](https://console.cloud.google.com/) → 选择您的项目。
+2. 左侧 **API 和服务** → **凭据** → 点击您使用的 **OAuth 2.0 客户端 ID**（类型为“Web 应用”）。
+3. 在 **已授权的 JavaScript 源** 中，确保包含**当前页面使用的完整地址**，例如：
+   - 本地：`http://localhost:5173`、`http://localhost:5174`、`http://localhost:5175`（你当前用的是哪个端口就加哪个）。
+   - 线上：`https://你的项目.vercel.app`（若已部署）。
+4. 在 **已授权的重定向 URI** 中，**逐条添加与上面相同的地址**（可同时加带 `/` 和不带 `/` 的，如 `http://localhost:5173` 和 `http://localhost:5173/`）。
+5. 点击 **保存**，等待约 1–2 分钟生效后，清除浏览器缓存或换无痕窗口再试登录。
+
+注意：地址必须与浏览器地址栏里的一模一样（协议、端口、有无末尾斜杠），否则仍会报 redirect_uri_mismatch。
+
 ## 故障排除
 
 如果遇到问题：
 
 1. **认证失败**：检查客户端 ID 是否正确配置
-2. **API 未启用**：确保已在 Google Cloud Console 中启用 Google Drive API
-3. **权限错误**：确保 OAuth 同意屏幕已正确配置
-4. **CORS 错误**：确保已授权的 JavaScript 源包含当前域名
+2. **redirect_uri_mismatch**：按上面「解决 Error 400: redirect_uri_mismatch」逐项检查并保存
+3. **API 未启用**：确保已在 Google Cloud Console 中启用 Google Drive API
+4. **权限错误**：确保 OAuth 同意屏幕已正确配置，且测试用户已添加您的邮箱
+5. **CORS 错误**：确保已授权的 JavaScript 源包含当前域名
 
 ## 生产环境配置
 
