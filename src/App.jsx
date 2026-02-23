@@ -37,6 +37,7 @@ import {
   Undo2,
   Redo2
 } from 'lucide-react';
+import Preview3D from './components/Preview3D';
 
 /**
  * Landscape Configurator Pro v0.5.1
@@ -1253,7 +1254,8 @@ const App = () => {
           </div>
         </header>
 
-        <div ref={viewportRef} className="flex-1 overflow-auto bg-[#0a0a0a] relative scrollbar-hide">
+        <div className="flex-1 flex min-h-0">
+          <div ref={viewportRef} className="flex-1 overflow-auto bg-[#0a0a0a] relative scrollbar-hide">
           {viewMode === 'design' ? (
             <div className="flex items-center justify-center min-w-full min-h-full" style={{ padding: '800px' }}>
               <div 
@@ -1428,6 +1430,15 @@ const App = () => {
               </div>
             </div>
           )}
+        </div>
+        {viewMode === 'design' && (
+          <aside className="w-[26rem] flex-shrink-0 border-l border-slate-800 bg-slate-900/80 flex flex-col p-3">
+            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">3D Preview</div>
+            <div className="flex-1 min-h-0 min-w-0">
+              <Preview3D elements={placedElements} canvasMetersW={canvasMetersW} canvasMetersH={canvasMetersH} />
+            </div>
+          </aside>
+        )}
         </div>
 
         <footer className="h-12 bg-slate-900 border-t border-slate-800 px-8 flex items-center justify-between text-[10px] text-slate-500 font-black uppercase tracking-widest">

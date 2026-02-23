@@ -1,0 +1,233 @@
+import React, { useMemo } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
+
+// Lightweight 3D preview: map 2D canvas elements to simple meshes.
+// 2D: x right, y down (meters). 3D: X = x - cx, Z = y - cy (so 2D top = 3D -Z, 2D bottom = 3D +Z; no vertical mirror).
+// Scene centered with cx, cy.
+
+// Layer Y to avoid z-fight: grass/water bottom, path/play/fitness middle, plaza on top
+const LAYER_GRASS = 0.02;
+const LAYER_PATH = 0.04;
+const LAYER_PLAZA = 0.06;
+const COMMUNITY_HUB_HEIGHT = 2.5;
+
+function getLayerY(el) {
+  const t = el.type;
+  if (['grass', 'grass-organic', 'water-organic', 'water-area', 'pond-circular', 'reflecting-pool'].includes(t) || el.shape === 'organic' || el.shape === 'polygon') return LAYER_GRASS;
+  if (['court-l', 'play-area', 'fitness'].includes(t)) return LAYER_PATH;
+  if (['plaza-rect', 'plaza-circle'].includes(t)) return LAYER_PLAZA;
+  return LAYER_GRASS;
+}
+
+function hexToThreeColor(hex) {
+  return new THREE.Color(hex);
+}
+
+// 将 organic 的贝塞尔顶点展平为多边形点（与 App.jsx 中逻辑一致）
+function flattenOrganic(vertices) {
+  if (!vertices || vertices.length < 3) return [];
+  const flattened = [];
+  const segments = 6;
+  for (let i = 0; i < vertices.length; i++) {
+    const p1 = vertices[i];
+    const p2 = vertices[(i + 1) % vertices.length];
+    for (let t = 0; t < segments; t++) {
+      const step = t / segments;
+      const x = (1 - step) * (1 - step) * p1.x + 2 * (1 - step) * step * ((p1.x + p2.x) / 2) + step * step * p2.x;
+      const y = (1 - step) * (1 - step) * p1.y + 2 * (1 - step) * step * ((p1.y + p2.y) / 2) + step * step * p2.y;
+      flattened.push({ x, y });
+    }
+  }
+  return flattened;
+}
+
+// 根据顶点构建 Three.js Shape（局部坐标：原点为元素中心，2D y 向下 = 3D 中 shape 的 y 取反后为 Z）
+function shapeFromVertices(vertices, w, h, isOrganic) {
+  const points = isOrganic ? flattenOrganic(vertices) : (vertices || []);
+  if (points.length < 3) return null;
+  const cx = w / 2;
+  const cy = h / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(points[0].x - cx, cy - points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    shape.lineTo(points[i].x - cx, cy - points[i].y);
+  }
+  shape.closePath();
+  return shape;
+}
+
+function ElementMesh({ el, cx, cy }) {
+  const w = el.width || 1;
+  const h = el.height || 1;
+  // 2D 使用左上角 (el.x, el.y)，3D 的 plane 以中心为原点，故用 2D 中心对齐避免整体偏左/偏上
+  const x = (el.x + w / 2) - cx;
+  const z = (el.y + h / 2) - cy;
+  const rotY = (-el.rotation * Math.PI) / 180;
+  const color = el.color ? hexToThreeColor(el.color) : new THREE.Color('#888');
+  const isTree = /^tree-/.test(el.type);
+  const isShrub = /^shrub-/.test(el.type);
+  const isFountain = el.type === 'fountain';
+  const isLamp = el.type === 'lamp';
+  const isCommunityHub = el.type === 'plaza-circle';
+  const isFlat = ['grass', 'grass-organic', 'water-organic', 'water-area', 'pond-circular', 'reflecting-pool', 'plaza-rect', 'plaza-circle', 'court-l', 'play-area', 'fitness'].includes(el.type) || el.shape === 'organic' || el.shape === 'polygon';
+
+  // Community Hub only: building height (cylinder)
+  if (isCommunityHub) {
+    const r = Math.max(w, h) / 2;
+    const layerY = getLayerY(el);
+    return (
+      <group position={[x, layerY + COMMUNITY_HUB_HEIGHT / 2, z]} rotation={[0, rotY, 0]}>
+        <mesh castShadow receiveShadow>
+          <cylinderGeometry args={[r, r, COMMUNITY_HUB_HEIGHT, 16]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (isTree) {
+    const trunkH = Math.max(1.2, h * 0.45);
+    const foliageR = Math.max(0.8, Math.min(w, h) * 0.4);
+    return (
+      <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
+        <mesh position={[0, trunkH / 2, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[w * 0.08, w * 0.12, trunkH, 6]} />
+          <meshStandardMaterial color="#5d4e37" />
+        </mesh>
+        <mesh position={[0, trunkH + foliageR * 0.6, 0]} castShadow>
+          <sphereGeometry args={[foliageR, 6, 5]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (isShrub) {
+    const r = Math.max(0.4, (w + h) / 4);
+    return (
+      <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
+        <mesh position={[0, r * 0.6, 0]} castShadow>
+          <sphereGeometry args={[r, 6, 5]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (isFountain) {
+    return (
+      <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
+        <mesh position={[0, 0.2, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[w * 0.4, w * 0.45, 0.4, 12]} />
+          <meshStandardMaterial color={color} />
+        </mesh>
+        <mesh position={[0, 0.8, 0]} castShadow>
+          <sphereGeometry args={[w * 0.2, 6, 5]} />
+          <meshStandardMaterial color="#e0f2fe" />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (isLamp) {
+    return (
+      <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
+        <mesh position={[0, 0.5, 0]} castShadow>
+          <cylinderGeometry args={[0.08, 0.1, 1, 8]} />
+          <meshStandardMaterial color="#78716c" />
+        </mesh>
+        <mesh position={[0, 1.1, 0]} castShadow>
+          <sphereGeometry args={[0.2, 6, 5]} />
+          <meshStandardMaterial color="#fef08a" emissive="#fef08a" emissiveIntensity={0.3} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (isFlat) {
+    const layerY = getLayerY(el);
+    const isPolyOrOrganic = (el.shape === 'polygon' || el.shape === 'organic') && el.vertices && el.vertices.length >= 3;
+    const shape = isPolyOrOrganic ? shapeFromVertices(el.vertices, w, h, el.shape === 'organic') : null;
+    const size = el.shape === 'circle' ? Math.max(w, h) : 1;
+    const sx = el.shape === 'circle' ? size : w;
+    const sz = el.shape === 'circle' ? size : h;
+    return (
+      <group position={[x, layerY, z]} rotation={[0, rotY, 0]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          {shape ? (
+            <shapeGeometry args={[shape]} />
+          ) : el.shape === 'circle' ? (
+            <circleGeometry args={[sx / 2, 16]} />
+          ) : (
+            <planeGeometry args={[sx, sz]} />
+          )}
+          <meshStandardMaterial color={color} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Default: bench, table, trash, bike, etc. — simple box
+  const boxH = Math.min(1.2, h * 0.5) || 0.4;
+  return (
+    <group position={[x, boxH / 2, z]} rotation={[0, rotY, 0]}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[w, boxH, h]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+    </group>
+  );
+}
+
+function Scene({ elements, canvasMetersW, canvasMetersH }) {
+  const cx = canvasMetersW / 2;
+  const cy = canvasMetersH / 2;
+  const ext = Math.max(canvasMetersW, canvasMetersH) * 0.6;
+
+  // Draw in layer order to reduce z-fight: grass/water first, then path/play, then plaza
+  const sorted = useMemo(() => {
+    const order = (el) => {
+      if (el.type === 'plaza-circle') return 2;
+      if (['plaza-rect', 'court-l', 'play-area', 'fitness'].includes(el.type)) return 1;
+      return 0;
+    };
+    return [...elements].sort((a, b) => order(a) - order(b));
+  }, [elements]);
+
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[ext, ext * 1.2, ext]} intensity={0.9} castShadow shadow-mapSize={[512, 512]} shadow-camera-far={500} shadow-camera-left={-80} shadow-camera-right={80} shadow-camera-top={80} shadow-camera-bottom={-80} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+        <planeGeometry args={[canvasMetersW + 20, canvasMetersH + 20]} />
+        <meshStandardMaterial color="#cccccc" />
+      </mesh>
+      {sorted.map((el) => (
+        <ElementMesh key={el.id} el={el} cx={cx} cy={cy} />
+      ))}
+      <OrbitControls makeDefault enableDamping dampingFactor={0.1} minDistance={20} maxDistance={180} maxPolarAngle={Math.PI / 2 - 0.1} />
+    </>
+  );
+}
+
+export default function Preview3D({ elements, canvasMetersW, canvasMetersH }) {
+  const w = canvasMetersW || 100;
+  const h = canvasMetersH || 100;
+  const cameraPos = useMemo(() => [w * 0.4, h * 0.5, h * 0.6], [w, h]);
+
+  return (
+    <div className="w-full h-full min-h-[280px] bg-slate-900 rounded-xl overflow-hidden border border-slate-700">
+      <Canvas
+        camera={{ position: cameraPos, fov: 45, near: 0.5, far: 800 }}
+        shadows
+        gl={{ antialias: true, powerPreference: 'low-power', stencil: false, depth: true }}
+        dpr={[1, 1.5]}
+        frameloop="always"
+      >
+        <Scene elements={elements} canvasMetersW={w} canvasMetersH={h} />
+      </Canvas>
+    </div>
+  );
+}
