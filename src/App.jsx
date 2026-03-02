@@ -54,14 +54,26 @@ const USD_TO_SGD = 1.35;
 const DEFAULT_BASEMAP_PATH = '/default-basemap.png';
 const TEMPLATE_CANVAS_METERS_W = 112;
 const TEMPLATE_CANVAS_METERS_H = 96;
+/** 内置模板 path -> 显示名，用于导出中的 template 信息 */
+const BUILTIN_TEMPLATE_NAMES = {
+  '/templates/community-park1.json': 'Community Park 1',
+  '/templates/community-park2.json': 'Community Park 2',
+  '/templates/community-park3.json': 'Community Park 3',
+  '/templates/urban-park1.json': 'Urban Park 1',
+  '/templates/urban-park2.json': 'Urban Park 2',
+  '/templates/urban-park3.json': 'Urban Park 3',
+  '/templates/nature-park1.json': 'Nature Park 1',
+  '/templates/nature-park2.json': 'Nature Park 2',
+  '/templates/nature-park3.json': 'Nature Park 3',
+};
+const BUILTIN_TEMPLATE_LIST = Object.values(BUILTIN_TEMPLATE_NAMES);
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 0.52;  // 拉满约等于 130% 视野，界面仍显示 10%–100%
 const VIEWPORT_PADDING = 800;
 const GOOGLE_DRIVE_FOLDER_ID = '1Bfgu-mnON0dfQSEK33-GKOvMrpENx4bl';
-// Submit rule: cannot submit in template zone (45k–55k); can submit if <45k or 55k–70k; >70k cannot submit
-const BUDGET_ALLOCATION_SGD = 50000;
-const BUDGET_TOLERANCE = 0.1;   // 45k–55k = "template zone" (no submit)
-const BUDGET_MAX_SGD = 70000;   // hard cap: over 70k cannot submit
+// Submit rule: can submit only when budget is between 55k and 80k SGD; below 55k or above 80k cannot submit
+const SUBMIT_MIN_SGD = 55000;   // below this cannot submit
+const SUBMIT_MAX_SGD = 80000;   // above this cannot submit
 // 注意：需要在 Google Cloud Console 配置 OAuth 2.0 凭据
 // 请将下面的值替换为您的实际 Google API 凭据
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_CLIENT_ID.apps.googleusercontent.com';
@@ -79,10 +91,8 @@ const LIBRARY = {
     { type: 'grass', name: 'Polygon Lawn', width: 10, height: 10, color: '#16a34a', icon: '🌱', shape: 'polygon', isShading: false, areaPrice: 9 },
   ],
   WATER: [
-    { type: 'water-organic', name: 'Organic Lake', width: 15, height: 15, color: '#0ea5e9', icon: '🌊', shape: 'organic', areaPrice: 150 },
-    { type: 'water-area', name: 'Polygon Water', width: 8, height: 8, color: '#0284c7', icon: '🌊', shape: 'polygon', areaPrice: 140 },
-    { type: 'pond-circular', name: 'Circular Pond', width: 10, height: 10, color: '#38bdf8', icon: '💧', shape: 'circle', areaPrice: 130 },
-    { type: 'reflecting-pool', name: 'Reflecting Pool', width: 15, height: 5, color: '#0ea5e9', icon: '🌊', shape: 'rect', areaPrice: 280 },
+    { type: 'water-organic', name: 'Water Feature', width: 15, height: 15, color: '#0ea5e9', icon: '🌊', shape: 'organic', areaPrice: 150 },
+    { type: 'pond-circular', name: 'Pond', width: 10, height: 10, color: '#38bdf8', icon: '💧', shape: 'circle', areaPrice: 130 },
     { type: 'fountain', name: 'Ornamental Fountain', width: 4, height: 4, color: '#7dd3fc', icon: '⛲', shape: 'circle', unitPrice: 3200 },
   ],
   INFRASTRUCTURE: [
@@ -166,6 +176,24 @@ const calculatePolygonArea = (vertices) => {
   return Math.abs(area) / 2;
 };
 
+/** L 形路径默认顶点（局部坐标 0..w, 0..h）：左上、右上、右上内、内角、左下内、左上 */
+const getLShapeVertices = (w, h) => [
+  { x: 0, y: 0 },
+  { x: w, y: 0 },
+  { x: w, y: h * 0.3 },
+  { x: w * 0.3, y: h * 0.3 },
+  { x: w * 0.3, y: h },
+  { x: 0, y: h },
+];
+
+/** 单组件占地面积 (m²)，用于导出 */
+const getElementArea = (el) => {
+  if (!el) return 0;
+  if (el.shape === 'polygon' || el.shape === 'organic') return (el.vertices ? calculatePolygonArea(el.vertices) : 0);
+  if (el.shape === 'circle') return Math.PI * (Math.min(el.width || 0, el.height || 0) / 2) ** 2;
+  return (el.width || 0) * (el.height || 0);
+};
+
 const SidebarSection = ({ title, icon: Icon, children, id, activeSection, onToggle }) => {
   const isOpen = activeSection === id;
   return (
@@ -202,6 +230,12 @@ const App = () => {
 
   // Interaction States
   const [activeSection, setActiveSection] = useState('TEMPLATE');
+  /** 用户最后选择作为底稿的模板（内置名或 "Loaded from file"），用于导出 */
+  const [lastSelectedTemplate, setLastSelectedTemplate] = useState(null);
+  /** 每个内置模板被点击加载的次数，用于导出 */
+  const [templateClickCounts, setTemplateClickCounts] = useState(() =>
+    Object.fromEntries(BUILTIN_TEMPLATE_LIST.map((name) => [name, 0]))
+  );
   const [boxSelect, setBoxSelect] = useState(null);
   const [draggingEntity, setDraggingEntity] = useState(null); 
   const [resizingEntity, setResizingEntity] = useState(null); 
@@ -274,6 +308,17 @@ const App = () => {
 
   useEffect(() => {
     lastPlacedElementsRef.current = placedElements;
+  }, [placedElements]);
+
+  useEffect(() => {
+    const needsBackfill = placedElements.some(el => el.type === 'court-l' && el.shape === 'l-shape' && (!el.vertices || el.vertices.length < 3));
+    if (!needsBackfill) return;
+    setPlacedElements(prev => {
+      const next = prev.map(el => el.type === 'court-l' && el.shape === 'l-shape' && (!el.vertices || el.vertices.length < 3) ? { ...el, vertices: getLShapeVertices(el.width || 12, el.height || 12) } : el);
+      if (next.every((e, i) => e === prev[i])) return prev;
+      recordStep(next);
+      return next;
+    });
   }, [placedElements]);
 
   useEffect(() => {
@@ -473,6 +518,8 @@ const App = () => {
     const totalW = canvasMetersW;
     const totalH = canvasMetersH;
     const totalArea = Math.max(1, totalW * totalH);
+    // 情况 A：使用系统默认底图时，树覆盖率分母固定为 2025 m²（否则为实际画布面积）
+    const areaForCoverage = baseMap === DEFAULT_BASEMAP_PATH ? 2025 : totalArea;
 
     let shadeArea = 0;
     if (shadelist.length > 0) {
@@ -521,7 +568,7 @@ const App = () => {
 
     return { 
       shadeArea, totalArea, 
-      shadeRate: (shadeArea / totalArea) * 100, 
+      shadeRate: (shadeArea / areaForCoverage) * 100, 
       costUSD: totalCostUSD, 
       costSGD: totalCostUSD * USD_TO_SGD 
     };
@@ -659,6 +706,9 @@ const App = () => {
       newElement.vertices = [
         { x: 0, y: 0 }, { x: data.width, y: 0 }, { x: data.width, y: data.height }, { x: 0, y: data.height }
       ];
+    }
+    if (data.type === 'court-l' && data.shape === 'l-shape') {
+      newElement.vertices = getLShapeVertices(data.width || 12, data.height || 12);
     }
 
     setPlacedElements(prev => {
@@ -915,14 +965,21 @@ const App = () => {
 
   const loadTemplateFromJson = (data) => {
     clearInteractionState();
-    let elements = Array.isArray(data) ? data : (data && data.elements) ? data.elements : [];
+    // 支持新导出格式（templateInfo + summary + components）或旧格式（elements 或数组）
+    let elements = Array.isArray(data) ? data : (data && data.components) ? data.components : (data && data.elements) ? data.elements : [];
     const base = Date.now();
-    elements = elements.map((el, i) => ({
-      ...el,
-      id: `elem-${base}-${i}-${Math.random().toString(36).slice(2, 11)}`,
-      timestamp: new Date().toISOString(),
-      session_id: 'session_' + Math.random().toString(36).substr(2, 9)
-    }));
+    elements = elements.map((el, i) => {
+      const out = {
+        ...el,
+        id: `elem-${base}-${i}-${Math.random().toString(36).slice(2, 11)}`,
+        timestamp: new Date().toISOString(),
+        session_id: 'session_' + Math.random().toString(36).substr(2, 9)
+      };
+      if (out.type === 'court-l' && out.shape === 'l-shape' && (!out.vertices || out.vertices.length < 3)) {
+        out.vertices = getLShapeVertices(out.width || 12, out.height || 12);
+      }
+      return out;
+    });
     setPlacedElements(elements);
     recordStep(elements);
     setSelectedIds([]);
@@ -930,6 +987,9 @@ const App = () => {
 
   const loadBuiltInTemplate = async (templatePath) => {
     try {
+      const templateName = BUILTIN_TEMPLATE_NAMES[templatePath] || templatePath;
+      setLastSelectedTemplate(templateName);
+      setTemplateClickCounts((prev) => ({ ...prev, [templateName]: (prev[templateName] || 0) + 1 }));
       const res = await fetch(templatePath);
       if (!res.ok) throw new Error('Template not found');
       const data = await res.json();
@@ -946,6 +1006,7 @@ const App = () => {
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(ev.target.result);
+        setLastSelectedTemplate('Loaded from file');
         loadTemplateFromJson(data);
       } catch (err) {
         console.error('Invalid template JSON', err);
@@ -957,8 +1018,38 @@ const App = () => {
 
   const getExportFileName = () => `landscape_config_v051_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
 
+  /** 导出用：为每个组件附加 area (m²)，保留两位小数 */
+  const getExportElementsWithArea = () =>
+    placedElements.map((el) => ({ ...el, area: Math.round(getElementArea(el) * 100) / 100 }));
+
+  /** 水体只导出三种：water-organic(Water Feature)、pond-circular(Pond)、fountain；不导出 water-area、reflecting-pool */
+  const EXPORT_EXCLUDED_WATER_TYPES = ['water-area', 'reflecting-pool'];
+
+  /** 导出用：三层结构 templateInfo + summary + components */
+  const getExportPayload = () => {
+    const withArea = getExportElementsWithArea();
+    const components = withArea.filter((el) => !EXPORT_EXCLUDED_WATER_TYPES.includes(el.type));
+    const componentCounts = components.reduce((acc, el) => {
+      const t = el.type || 'unknown';
+      acc[t] = (acc[t] || 0) + 1;
+      return acc;
+    }, {});
+    return {
+      templateInfo: {
+        selectedTemplate: lastSelectedTemplate ?? null,
+        clickCounts: { ...templateClickCounts },
+      },
+      summary: {
+        totalCostSGD: Math.round(analysis.costSGD * 100) / 100,
+        treeCoveragePercent: Math.round(analysis.shadeRate * 10) / 10,
+        componentCounts,
+      },
+      components,
+    };
+  };
+
   const downloadJson = () => {
-    const dataStr = JSON.stringify(placedElements, null, 2);
+    const dataStr = JSON.stringify(getExportPayload(), null, 2);
     const fileName = getExportFileName();
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -971,18 +1062,16 @@ const App = () => {
     setTimeout(() => setUploadStatus(null), 2000);
   };
 
-  const budgetMinSGD = BUDGET_ALLOCATION_SGD * (1 - BUDGET_TOLERANCE);  // 45k
-  const budgetMaxSGD = BUDGET_ALLOCATION_SGD * (1 + BUDGET_TOLERANCE);  // 55k
-  const inTemplateZone = analysis.costSGD >= budgetMinSGD && analysis.costSGD <= budgetMaxSGD;
-  const overCap = analysis.costSGD > BUDGET_MAX_SGD;
-  const canSubmit = !inTemplateZone && !overCap;
+  const underMin = analysis.costSGD < SUBMIT_MIN_SGD;
+  const overCap = analysis.costSGD > SUBMIT_MAX_SGD;
+  const canSubmit = analysis.costSGD >= SUBMIT_MIN_SGD && analysis.costSGD <= SUBMIT_MAX_SGD;
 
   const submitToTeacher = async () => {
     if (!canSubmit) {
-      if (overCap) {
-        setUploadStatus(`Cannot submit. Total budget must not exceed ${(BUDGET_MAX_SGD / 1000).toFixed(0)},000 SGD. Your total: $${Math.round(analysis.costSGD).toLocaleString()} SGD.`);
-      } else {
-        setUploadStatus(`Cannot submit. Budget must be outside the allocation range (${(budgetMinSGD / 1000).toFixed(0)}k–${(budgetMaxSGD / 1000).toFixed(0)}k SGD) so your design reflects real choices. Adjust below ${(budgetMinSGD / 1000).toFixed(0)}k or above ${(budgetMaxSGD / 1000).toFixed(0)}k (max ${(BUDGET_MAX_SGD / 1000).toFixed(0)}k).`);
+      if (underMin) {
+        setUploadStatus(`Cannot submit. Budget must be at least ${(SUBMIT_MIN_SGD / 1000).toFixed(0)}k SGD (yours: $${Math.round(analysis.costSGD).toLocaleString()} SGD). Submit allowed only between 55k and 80k SGD.`);
+      } else if (overCap) {
+        setUploadStatus(`Cannot submit. Total budget must not exceed ${(SUBMIT_MAX_SGD / 1000).toFixed(0)}k SGD. Your total: $${Math.round(analysis.costSGD).toLocaleString()} SGD. Submit allowed only between 55k and 80k SGD.`);
       }
       setTimeout(() => setUploadStatus(null), 6000);
       return;
@@ -998,7 +1087,7 @@ const App = () => {
     try {
       setIsExporting(true);
       setUploadStatus('Submitting…');
-      const dataStr = JSON.stringify(placedElements, null, 2);
+      const dataStr = JSON.stringify(getExportPayload(), null, 2);
       const fileName = getExportFileName();
       const res = await fetch(apiUrl, {
         method: 'POST',
@@ -1018,7 +1107,7 @@ const App = () => {
   const exportData = async () => {
     try {
       setUploadStatus('Preparing upload…');
-      const dataStr = JSON.stringify(placedElements, null, 2);
+      const dataStr = JSON.stringify(getExportPayload(), null, 2);
       const fileName = getExportFileName();
       await uploadToGoogleDrive(fileName, dataStr, 'application/json');
     } catch (err) {
@@ -1223,7 +1312,7 @@ const App = () => {
               <button
                 onClick={submitToTeacher}
                 disabled={isExporting || !canSubmit}
-                title={!canSubmit ? (overCap ? 'Budget must not exceed 70,000 SGD' : 'Submit allowed only when budget is under 45k or between 55k and 70k') : ''}
+                title={!canSubmit ? (overCap ? 'Budget must not exceed 80,000 SGD' : underMin ? 'Budget must be at least 55,000 SGD' : 'Submit allowed only when budget is between 55k and 80k SGD') : ''}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 ${
                   isExporting ? 'bg-sky-600/50 text-white/50 cursor-not-allowed' : !canSubmit ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-sky-600 text-white hover:bg-sky-500'
                 }`}
@@ -1296,12 +1385,14 @@ const App = () => {
                 )}
                 {placedElements.map((el) => {
                   const isSelected = selectedIds.includes(el.id);
-                  const isPoly = el.shape === 'polygon' || el.shape === 'organic';
+                  const lShapeVertices = el.type === 'court-l' && el.shape === 'l-shape' ? (el.vertices && el.vertices.length >= 3 ? el.vertices : getLShapeVertices(el.width || 12, el.height || 12)) : null;
+                  const isPoly = el.shape === 'polygon' || el.shape === 'organic' || (el.shape === 'l-shape' && (el.vertices?.length >= 3 || lShapeVertices));
+                  const displayVertices = isPoly && (el.shape === 'l-shape' ? (el.vertices?.length >= 3 ? el.vertices : lShapeVertices) : el.vertices);
                   const isDragging = draggingEntity?.ids?.includes(el.id);
-                  const polyMin = isPoly && el.vertices && el.vertices.length
-                    ? { x: Math.min(...el.vertices.map(v => v.x)), y: Math.min(...el.vertices.map(v => v.y)) }
+                  const polyMin = displayVertices && displayVertices.length
+                    ? { x: Math.min(...displayVertices.map(v => v.x)), y: Math.min(...displayVertices.map(v => v.y)) }
                     : { x: 0, y: 0 };
-                  // 多边形/有机形：div 始终按“形状左上角”定位，避免点击顶点手柄瞬间从 el.x 切到 el.x+polyMin 导致左跳
+                  // 多边形/有机形/L 形：div 按形状左上角定位，不设 clipPath 以便工具栏可见
                   const renderX = isPoly ? el.x + polyMin.x : el.x;
                   const renderY = isPoly ? el.y + polyMin.y : el.y;
                   return (
@@ -1316,15 +1407,14 @@ const App = () => {
                         border: isPoly ? 'none' : `2px solid ${el.color}`,
                         borderRadius: el.shape === 'circle' ? '50%' : '6px', 
                         transform: `rotate(${el.rotation}deg)`, transformOrigin: 'center center',
-                        clipPath: el.shape === 'l-shape' ? 'polygon(0% 0%, 100% 0%, 100% 30%, 30% 30%, 30% 100%, 0% 100%)' : 'none'
                       }}
                     >
-                      {isPoly && el.vertices && (
+                      {isPoly && displayVertices && (
                         <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none" style={{ transform: `translate(${-polyMin.x * GRID_SIZE}px, ${-polyMin.y * GRID_SIZE}px)` }}>
                           {el.shape === 'organic' ? (
                             <path d={getOrganicPath(el.vertices)} fill={el.color + (isSelected ? '99' : '55')} stroke={el.color} strokeWidth="2" />
                           ) : (
-                            <polygon points={el.vertices.map(v => `${v.x * GRID_SIZE},${v.y * GRID_SIZE}`).join(' ')} fill={el.color + (isSelected ? '99' : '55')} stroke={el.color} strokeWidth="2" />
+                            <polygon points={displayVertices.map(v => `${v.x * GRID_SIZE},${v.y * GRID_SIZE}`).join(' ')} fill={el.color + (isSelected ? '99' : '55')} stroke={el.color} strokeWidth="2" />
                           )}
                         </svg>
                       )}
@@ -1377,10 +1467,10 @@ const App = () => {
                         <span className="text-lg font-mono font-black text-emerald-400">${analysis.costSGD.toLocaleString()}</span>
                       </div>
                       <div className="text-[9px] text-slate-500">
-                        Submit allowed: under {(budgetMinSGD / 1000).toFixed(0)}k or {(budgetMaxSGD / 1000).toFixed(0)}k–{(BUDGET_MAX_SGD / 1000).toFixed(0)}k SGD (45k–55k = template zone, no submit)
+                        Submit allowed: {(SUBMIT_MIN_SGD / 1000).toFixed(0)}k–{(SUBMIT_MAX_SGD / 1000).toFixed(0)}k SGD only (below 55k or above 80k = cannot submit)
                       </div>
                       <div className={`text-[10px] font-bold ${canSubmit ? 'text-emerald-400' : 'text-amber-400'}`}>
-                        {canSubmit ? 'Within allowed range — submit enabled' : overCap ? 'Over 70k cap — cannot submit' : 'In template zone (45k–55k) — cannot submit'}
+                        {canSubmit ? 'Within 55k–80k — submit enabled' : overCap ? 'Over 80k — cannot submit' : 'Below 55k — cannot submit'}
                       </div>
                     </div>
                   </div>

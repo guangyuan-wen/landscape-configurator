@@ -7,18 +7,23 @@ import * as THREE from 'three';
 // 2D: x right, y down (meters). 3D: X = x - cx, Z = y - cy (so 2D top = 3D -Z, 2D bottom = 3D +Z; no vertical mirror).
 // Scene centered with cx, cy.
 
-// Layer Y to avoid z-fight: grass/water bottom, path/play/fitness middle, plaza on top
+// Layer Y 分层拉大间距，减少闪烁（z-fight）：从低到高 grass → water → path → play → fitness → plaza
 const LAYER_GRASS = 0.02;
-const LAYER_PATH = 0.04;
-const LAYER_PLAZA = 0.06;
+const LAYER_WATER = 0.045;   // water feature、pond 略高于草地
+const LAYER_PATH = 0.07;     // court-l (路径)
+const LAYER_PLAY = 0.10;     // playground
+const LAYER_FITNESS = 0.13;  // outdoor gym
+const LAYER_PLAZA = 0.16;    // 广场
 const COMMUNITY_HUB_HEIGHT = 2.5;
 
 function getLayerY(el) {
   const t = el.type;
-  if (['grass', 'grass-organic', 'water-organic', 'water-area', 'pond-circular', 'reflecting-pool'].includes(t) || el.shape === 'organic' || el.shape === 'polygon') return LAYER_GRASS;
-  if (['court-l', 'play-area', 'fitness'].includes(t)) return LAYER_PATH;
+  if (['water-organic', 'water-area', 'pond-circular', 'reflecting-pool'].includes(t)) return LAYER_WATER;
+  if (['court-l'].includes(t)) return LAYER_PATH;
+  if (t === 'play-area') return LAYER_PLAY;
+  if (t === 'fitness') return LAYER_FITNESS;
   if (['plaza-rect', 'plaza-circle'].includes(t)) return LAYER_PLAZA;
-  return LAYER_GRASS;
+  return LAYER_GRASS; // grass, grass-organic, polygon lawn, 及其他
 }
 
 function hexToThreeColor(hex) {
@@ -56,6 +61,13 @@ function shapeFromVertices(vertices, w, h, isOrganic) {
   }
   shape.closePath();
   return shape;
+}
+
+/** L 形路径默认 6 顶点（与 App.jsx getLShapeVertices 一致） */
+function getLShapeDefaultVertices(w, h) {
+  return [
+    { x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h * 0.3 }, { x: w * 0.3, y: h * 0.3 }, { x: w * 0.3, y: h }, { x: 0, y: h },
+  ];
 }
 
 function ElementMesh({ el, cx, cy }) {
@@ -149,7 +161,9 @@ function ElementMesh({ el, cx, cy }) {
   if (isFlat) {
     const layerY = getLayerY(el);
     const isPolyOrOrganic = (el.shape === 'polygon' || el.shape === 'organic') && el.vertices && el.vertices.length >= 3;
-    const shape = isPolyOrOrganic ? shapeFromVertices(el.vertices, w, h, el.shape === 'organic') : null;
+    const isLShape = el.type === 'court-l' && el.shape === 'l-shape';
+    const lShapeVertices = isLShape ? (el.vertices && el.vertices.length >= 3 ? el.vertices : getLShapeDefaultVertices(w, h)) : null;
+    const shape = isPolyOrOrganic ? shapeFromVertices(el.vertices, w, h, el.shape === 'organic') : (isLShape && lShapeVertices ? shapeFromVertices(lShapeVertices, w, h, false) : null);
     const size = el.shape === 'circle' ? Math.max(w, h) : 1;
     const sx = el.shape === 'circle' ? size : w;
     const sz = el.shape === 'circle' ? size : h;
@@ -163,7 +177,7 @@ function ElementMesh({ el, cx, cy }) {
           ) : (
             <planeGeometry args={[sx, sz]} />
           )}
-          <meshStandardMaterial color={color} />
+          <meshStandardMaterial color={color} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-2} />
         </mesh>
       </group>
     );
@@ -186,11 +200,15 @@ function Scene({ elements, canvasMetersW, canvasMetersH }) {
   const cy = canvasMetersH / 2;
   const ext = Math.max(canvasMetersW, canvasMetersH) * 0.6;
 
-  // Draw in layer order to reduce z-fight: grass/water first, then path/play, then plaza
+  // 按层级从低到高绘制，减少 z-fight
   const sorted = useMemo(() => {
     const order = (el) => {
-      if (el.type === 'plaza-circle') return 2;
-      if (['plaza-rect', 'court-l', 'play-area', 'fitness'].includes(el.type)) return 1;
+      const t = el.type;
+      if (['plaza-rect', 'plaza-circle'].includes(t)) return 5;
+      if (t === 'fitness') return 4;
+      if (t === 'play-area') return 3;
+      if (t === 'court-l') return 2;
+      if (['water-organic', 'water-area', 'pond-circular', 'reflecting-pool'].includes(t)) return 1;
       return 0;
     };
     return [...elements].sort((a, b) => order(a) - order(b));
