@@ -194,8 +194,7 @@ const getElementArea = (el) => {
   return (el.width || 0) * (el.height || 0);
 };
 
-const SidebarSection = ({ title, icon: Icon, children, id, activeSection, onToggle }) => {
-  const isOpen = activeSection === id;
+const SidebarSection = ({ title, icon: Icon, children, id, isOpen, onToggle }) => {
   return (
     <div className="mb-4">
       <button 
@@ -229,7 +228,9 @@ const App = () => {
   const [accessToken, setAccessToken] = useState(null);
 
   // Interaction States
-  const [activeSection, setActiveSection] = useState('TEMPLATE');
+  /** 侧栏展开的区块 id 列表，可多选；点击标题切换该区块的展开/收起 */
+  const [openSectionIds, setOpenSectionIds] = useState(['TEMPLATE']);
+  const toggleSection = (id) => setOpenSectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   /** 用户最后选择作为底稿的模板（内置名或 "Loaded from file"），用于导出 */
   const [lastSelectedTemplate, setLastSelectedTemplate] = useState(null);
   /** 每个内置模板被点击加载的次数，用于导出 */
@@ -1147,7 +1148,7 @@ const App = () => {
           </div>
         </div>
       )}
-      <aside className="w-80 h-full bg-slate-800 border-r border-slate-700 shadow-2xl z-20 overflow-y-auto flex flex-col scrollbar-hide">
+      <aside className="w-80 h-full bg-slate-800 border-r border-slate-700 shadow-2xl z-20 overflow-y-auto flex flex-col min-w-[20rem]" style={{ scrollbarGutter: 'stable' }}>
         <div className="p-6 border-b border-slate-700 bg-slate-900/50">
           <h1 className="text-lg font-black flex items-center gap-2 text-emerald-400 uppercase tracking-tighter">
             <MapIcon size={20} />
@@ -1200,7 +1201,7 @@ const App = () => {
           )}
 
           {baseMap && (
-            <SidebarSection title="Calibration" icon={Settings2} id="MAP" activeSection={activeSection} onToggle={setActiveSection}>
+            <SidebarSection title="Calibration" icon={Settings2} id="MAP" isOpen={openSectionIds.includes('MAP')} onToggle={toggleSection}>
               <div className="space-y-4 px-1 py-1">
                 <div><label className="text-[9px] font-bold text-slate-400 uppercase block mb-2">Scale (x)</label><input type="range" min="0.1" max="5" step="0.01" value={mapConfig.scale} onChange={(e) => setMapConfig({...mapConfig, scale: parseFloat(e.target.value)})} className="w-full h-1 bg-slate-700 rounded-lg accent-emerald-500" disabled={mapConfig.isLocked} /></div>
                 <div><label className="text-[9px] font-bold text-slate-400 uppercase block mb-2">Opacity</label><input type="range" min="0" max="1" step="0.1" value={mapConfig.opacity} onChange={(e) => setMapConfig({...mapConfig, opacity: parseFloat(e.target.value)})} className="w-full h-1 bg-slate-700 rounded-lg accent-slate-500" /></div>
@@ -1211,7 +1212,7 @@ const App = () => {
             </SidebarSection>
           )}
 
-          <SidebarSection title="Template" icon={LayoutTemplate} id="TEMPLATE" activeSection={activeSection} onToggle={setActiveSection}>
+          <SidebarSection title="Template" icon={LayoutTemplate} id="TEMPLATE" isOpen={openSectionIds.includes('TEMPLATE')} onToggle={toggleSection}>
             <p className="text-[9px] text-slate-500 mb-3 px-1">Load a pre-designed layout. You can then drag more components on top.</p>
             <button type="button" onClick={() => loadBuiltInTemplate('/templates/community-park1.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left">
               <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🏘️</span> Community Park 1</span>
@@ -1255,7 +1256,7 @@ const App = () => {
             <input ref={templateFileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleTemplateFileSelect} />
           </SidebarSection>
 
-          <SidebarSection title="Vegetation" icon={Trees} id="VEGETATION" activeSection={activeSection} onToggle={setActiveSection}>
+          <SidebarSection title="Vegetation" icon={Trees} id="VEGETATION" isOpen={openSectionIds.includes('VEGETATION')} onToggle={toggleSection}>
             {LIBRARY.VEGETATION.map(item => (
               <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-emerald-500 transition-all group shadow-sm">
                 <div className="flex items-center gap-3"><span className="text-xl drop-shadow-md">{item.icon}</span><div><div className="text-[11px] font-black text-slate-200">{item.name}</div><div className="text-[9px] text-slate-500 font-bold italic">${item.unitPrice ? item.unitPrice + ' USD' : item.areaPrice + ' USD/m²'}</div><div className="text-[8px] text-emerald-400 font-bold uppercase italic">${item.unitPrice ? Math.round(item.unitPrice * USD_TO_SGD) + ' SGD' : Math.round(item.areaPrice * USD_TO_SGD) + ' SGD/m²'}</div></div></div>
@@ -1264,19 +1265,19 @@ const App = () => {
             ))}
           </SidebarSection>
 
-          <SidebarSection title="Water Features" icon={Waves} id="WATER" activeSection={activeSection} onToggle={setActiveSection}>
+          <SidebarSection title="Water Features" icon={Waves} id="WATER" isOpen={openSectionIds.includes('WATER')} onToggle={toggleSection}>
             {LIBRARY.WATER.map(item => (
               <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-sky-500 transition-all group shadow-sm"><div className="flex items-center gap-3 text-[11px] font-bold text-slate-200 uppercase tracking-tighter"><span className="text-lg">{item.icon}</span> {item.name}</div><Move size={12} className="text-slate-600" /></div>
             ))}
           </SidebarSection>
 
-          <SidebarSection title="Infrastructure" icon={Armchair} id="INFRASTRUCTURE" activeSection={activeSection} onToggle={setActiveSection}>
+          <SidebarSection title="Infrastructure" icon={Armchair} id="INFRASTRUCTURE" isOpen={openSectionIds.includes('INFRASTRUCTURE')} onToggle={toggleSection}>
             {LIBRARY.INFRASTRUCTURE.map(item => (
               <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-orange-500 transition-all group shadow-sm"><div className="flex items-center gap-3 text-[11px] font-bold text-slate-200 uppercase tracking-tighter"><span className="text-lg">{item.icon}</span> {item.name}</div><Move size={12} className="text-slate-600" /></div>
             ))}
           </SidebarSection>
 
-          <SidebarSection title="Activity Frames" icon={Layout} id="ACTIVITY" activeSection={activeSection} onToggle={setActiveSection}>
+          <SidebarSection title="Activity Frames" icon={Layout} id="ACTIVITY" isOpen={openSectionIds.includes('ACTIVITY')} onToggle={toggleSection}>
             {LIBRARY.ACTIVITY.map(item => (
               <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-indigo-500 transition-all group shadow-sm"><div className="flex items-center gap-3 text-[11px] font-bold text-slate-200 uppercase tracking-tighter"><span className="text-lg">{item.icon}</span> {item.name}</div><Move size={12} className="text-slate-600" /></div>
             ))}

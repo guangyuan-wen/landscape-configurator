@@ -7,13 +7,13 @@ import * as THREE from 'three';
 // 2D: x right, y down (meters). 3D: X = x - cx, Z = y - cy (so 2D top = 3D -Z, 2D bottom = 3D +Z; no vertical mirror).
 // Scene centered with cx, cy.
 
-// Layer Y 分层拉大间距，减少闪烁（z-fight）：从低到高 grass → water → path → play → fitness → plaza
+// Layer Y 分层：从低到高 grass → 广场 → playground → fitness → 路径 → 水体（水体最高）
 const LAYER_GRASS = 0.02;
-const LAYER_WATER = 0.045;   // water feature、pond 略高于草地
-const LAYER_PATH = 0.07;     // court-l (路径)
-const LAYER_PLAY = 0.10;     // playground
-const LAYER_FITNESS = 0.13;  // outdoor gym
-const LAYER_PLAZA = 0.16;    // 广场
+const LAYER_PLAZA = 0.045;   // 广场 最低
+const LAYER_PLAY = 0.07;     // playground
+const LAYER_FITNESS = 0.10;  // outdoor gym
+const LAYER_PATH = 0.13;     // court-l (路径) 第二高
+const LAYER_WATER = 0.16;    // water feature、pond、水体 最高
 const COMMUNITY_HUB_HEIGHT = 2.5;
 
 function getLayerY(el) {
@@ -200,15 +200,15 @@ function Scene({ elements, canvasMetersW, canvasMetersH }) {
   const cy = canvasMetersH / 2;
   const ext = Math.max(canvasMetersW, canvasMetersH) * 0.6;
 
-  // 按层级从低到高绘制，减少 z-fight
+  // 按层级从低到高绘制，减少 z-fight（顺序：grass/其他 → 广场 → playground → fitness → 路径 → 水体）
   const sorted = useMemo(() => {
     const order = (el) => {
       const t = el.type;
-      if (['plaza-rect', 'plaza-circle'].includes(t)) return 5;
-      if (t === 'fitness') return 4;
-      if (t === 'play-area') return 3;
-      if (t === 'court-l') return 2;
-      if (['water-organic', 'water-area', 'pond-circular', 'reflecting-pool'].includes(t)) return 1;
+      if (['water-organic', 'water-area', 'pond-circular', 'reflecting-pool'].includes(t)) return 5;
+      if (t === 'court-l') return 4;
+      if (t === 'fitness') return 3;
+      if (t === 'play-area') return 2;
+      if (['plaza-rect', 'plaza-circle'].includes(t)) return 1;
       return 0;
     };
     return [...elements].sort((a, b) => order(a) - order(b));
