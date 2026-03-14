@@ -77,7 +77,9 @@ const SUBMIT_MAX_SGD = 80000;   // above this cannot submit
 // 注意：需要在 Google Cloud Console 配置 OAuth 2.0 凭据
 // 请将下面的值替换为您的实际 Google API 凭据
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file'; 
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+/** 默认用户版（仅 Submit）。需完整版时设 VITE_SHOW_EXPORT_BUTTONS=true，显示 Download JSON 与 Upload to Google Drive */
+const showExportButtons = import.meta.env.VITE_SHOW_EXPORT_BUTTONS === 'true' || import.meta.env.VITE_SHOW_EXPORT_BUTTONS === '1';
 
 const LIBRARY = {
   VEGETATION: [
@@ -1393,12 +1395,14 @@ const App = () => {
               <span className="text-xs font-mono font-bold w-12 text-emerald-400">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={downloadJson}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 bg-emerald-600 text-white hover:bg-emerald-500"
-              >
-                <Download size={16} /> Download JSON
-              </button>
+              {showExportButtons && (
+                <button
+                  onClick={downloadJson}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 bg-emerald-600 text-white hover:bg-emerald-500"
+                >
+                  <Download size={16} /> Download JSON
+                </button>
+              )}
               <button
                 onClick={() => canSubmit && !isExporting ? setShowFeedbackModal(true) : submitToTeacher()}
                 disabled={isExporting || !canSubmit}
@@ -1409,15 +1413,17 @@ const App = () => {
               >
                 <Download size={16} /> {isExporting ? 'Submitting…' : canSubmit ? 'Submit' : 'Cannot submit'}
               </button>
-              <button
-                onClick={exportData}
-                disabled={isExporting}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 border border-slate-600 ${
-                  isExporting ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                <Download size={16} /> Upload to Google Drive
-              </button>
+              {showExportButtons && (
+                <button
+                  onClick={exportData}
+                  disabled={isExporting}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 border border-slate-600 ${
+                    isExporting ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Download size={16} /> Upload to Google Drive
+                </button>
+              )}
               {uploadStatus && (
                 <div className={`px-4 py-2 rounded-xl text-xs font-bold ${
                   (uploadStatus.includes('success') || uploadStatus.includes('Successfully') || uploadStatus.includes('Downloaded') || uploadStatus.includes('Uploaded'))
