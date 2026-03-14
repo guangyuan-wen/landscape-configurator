@@ -226,6 +226,9 @@ const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
+  /** Submit 前意见弹窗：是否显示、用户输入的反馈内容 */
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackInput, setFeedbackInput] = useState('');
 
   // Interaction States
   /** 侧栏展开的区块 id 列表，可多选；点击标题切换该区块的展开/收起 */
@@ -1067,6 +1070,15 @@ const App = () => {
   const overCap = analysis.costSGD > SUBMIT_MAX_SGD;
   const canSubmit = analysis.costSGD >= SUBMIT_MIN_SGD && analysis.costSGD <= SUBMIT_MAX_SGD;
 
+  /** 构建提交用 JSON：意见放在最前面，然后是 templateInfo、summary、components */
+  const getSubmitPayload = (participantFeedback) => {
+    const base = getExportPayload();
+    return {
+      participantFeedback: participantFeedback != null && String(participantFeedback).trim() ? String(participantFeedback).trim() : null,
+      ...base,
+    };
+  };
+
   const submitToTeacher = async () => {
     if (!canSubmit) {
       if (underMin) {
@@ -1088,7 +1100,8 @@ const App = () => {
     try {
       setIsExporting(true);
       setUploadStatus('Submitting…');
-      const dataStr = JSON.stringify(getExportPayload(), null, 2);
+      const payload = getSubmitPayload('');
+      const dataStr = JSON.stringify(payload, null, 2);
       const fileName = getExportFileName();
       const res = await fetch(apiUrl, {
         method: 'POST',
@@ -1100,6 +1113,41 @@ const App = () => {
       setTimeout(() => { setUploadStatus(null); setIsExporting(false); }, 4000);
     } catch (err) {
       console.error('submitToTeacher error', err);
+      setUploadStatus('Submit failed: ' + (err && err.message ? err.message : 'Please try again.'));
+      setTimeout(() => { setUploadStatus(null); setIsExporting(false); }, 4000);
+    }
+  };
+
+  /** 从意见弹窗提交：带上用户反馈，JSON 中 participantFeedback 在最前，再发邮件 */
+  const submitWithFeedback = async (feedbackText) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const isProduction = origin && !origin.startsWith('http://localhost');
+    const apiUrl = isProduction ? origin + '/api/submit' : (import.meta.env.VITE_SUBMIT_API_URL || origin + '/api/submit');
+    if (!apiUrl) {
+      setUploadStatus('Submit URL not configured. Use Download JSON and send the file yourself.');
+      setTimeout(() => setUploadStatus(null), 4000);
+      setShowFeedbackModal(false);
+      setFeedbackInput('');
+      return;
+    }
+    try {
+      setIsExporting(true);
+      setShowFeedbackModal(false);
+      setFeedbackInput('');
+      setUploadStatus('Submitting…');
+      const payload = getSubmitPayload(feedbackText);
+      const dataStr = JSON.stringify(payload, null, 2);
+      const fileName = getExportFileName();
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName, data: dataStr }),
+      });
+      if (!res.ok) throw new Error(await res.text() || res.statusText);
+      setUploadStatus('Submitted successfully. Sent to email.');
+      setTimeout(() => { setUploadStatus(null); setIsExporting(false); }, 4000);
+    } catch (err) {
+      console.error('submitWithFeedback error', err);
       setUploadStatus('Submit failed: ' + (err && err.message ? err.message : 'Please try again.'));
       setTimeout(() => { setUploadStatus(null); setIsExporting(false); }, 4000);
     }
@@ -1121,6 +1169,47 @@ const App = () => {
 
   return (
     <div className="flex h-screen w-full bg-slate-900 font-sans overflow-hidden text-slate-200 select-none">
+      {/* Submit 前意见弹窗：可选填写反馈后再提交 */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+          <div className="bg-slate-800 border-2 border-sky-500/60 text-white px-8 py-6 rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200 relative">
+            <button
+              type="button"
+              onClick={() => { setShowFeedbackModal(false); setFeedbackInput(''); }}
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-600 transition-all"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+            <div className="text-sky-400 mb-2 text-sm font-black uppercase tracking-wider">Feedback (optional)</div>
+            <p className="text-slate-200 text-left mb-3">Do you have any feedback on this interaction?</p>
+            <textarea
+              value={feedbackInput}
+              onChange={(e) => setFeedbackInput(e.target.value)}
+              placeholder="Optional — you can submit without typing anything"
+              rows={4}
+              className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-y mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowFeedbackModal(false); setFeedbackInput(''); }}
+                className="flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase bg-slate-600 hover:bg-slate-500 text-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => submitWithFeedback(feedbackInput)}
+                className="flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase bg-sky-600 hover:bg-sky-500 text-white transition-all"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 上传状态：中央醒目提示，确保用户能看到 */}
       {uploadStatus && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
@@ -1311,7 +1400,7 @@ const App = () => {
                 <Download size={16} /> Download JSON
               </button>
               <button
-                onClick={submitToTeacher}
+                onClick={() => canSubmit && !isExporting ? setShowFeedbackModal(true) : submitToTeacher()}
                 disabled={isExporting || !canSubmit}
                 title={!canSubmit ? (overCap ? 'Budget must not exceed 80,000 SGD' : underMin ? 'Budget must be at least 55,000 SGD' : 'Submit allowed only when budget is between 55k and 80k SGD') : ''}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 ${
