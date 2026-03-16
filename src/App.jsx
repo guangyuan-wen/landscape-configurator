@@ -10,6 +10,7 @@ import {
   Info,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Image as ImageIcon,
   Settings2, 
   Lock,
@@ -235,6 +236,8 @@ const App = () => {
   // Interaction States
   /** 侧栏展开的区块 id 列表，可多选；点击标题切换该区块的展开/收起 */
   const [openSectionIds, setOpenSectionIds] = useState(['TEMPLATE']);
+  /** 底栏快捷键提示区块：默认展开，用户可关闭 */
+  const [footerShortcutsOpen, setFooterShortcutsOpen] = useState(true);
   const toggleSection = (id) => setOpenSectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   /** 用户最后选择作为底稿的模板（内置名或 "Loaded from file"），用于导出 */
   const [lastSelectedTemplate, setLastSelectedTemplate] = useState(null);
@@ -251,6 +254,11 @@ const App = () => {
   const [mapConfig, setMapConfig] = useState({
     scale: 1.0, offsetX: 0, offsetY: 0, opacity: 0.5, isLocked: true 
   });
+  /** 右侧 3D 预览面板宽度（px），可拖拽分隔条调节 */
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(416); // 26rem
+  const [previewResize, setPreviewResize] = useState({ active: false, startX: 0, startW: 0 });
+  const PREVIEW_MIN_W = 240;
+  const PREVIEW_MAX_W = 720;
   
   const canvasRef = useRef(null);
   const viewportRef = useRef(null);
@@ -267,6 +275,7 @@ const App = () => {
   const historyIndexRef = useRef(-1);
   const lastPlacedElementsRef = useRef([]);
   const copyBufferRef = useRef(null);
+  const previewResizeStartRef = useRef(null);
 
   const [showOpenLoginBtn, setShowOpenLoginBtn] = useState(false);
 
@@ -368,6 +377,32 @@ const App = () => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [placedElements, selectedIds]);
+
+  useEffect(() => {
+    if (!previewResize.active) return;
+    const clamp = (min, max, v) => Math.max(min, Math.min(max, v));
+    const onMove = (e) => {
+      const start = previewResizeStartRef.current;
+      if (!start) return;
+      setPreviewPanelWidth(clamp(PREVIEW_MIN_W, PREVIEW_MAX_W, start.startW + (start.startX - e.clientX)));
+    };
+    const onUp = () => {
+      setPreviewResize({ active: false, startX: 0, startW: 0 });
+      previewResizeStartRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [previewResize.active]);
 
   // 仅在需要时动态加载 Google 脚本，避免首屏白屏
   const loadGoogleScript = () => {
@@ -1316,7 +1351,11 @@ const App = () => {
               </div>
             </div>
           ) : (
-            <div className="mb-6"><button onClick={() => fileInputRef.current.click()} className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-600 rounded-xl hover:border-emerald-500 hover:bg-emerald-500/10 transition-all text-slate-400 hover:text-emerald-400 uppercase font-bold text-xs tracking-tighter"><ImageIcon size={16} /> {baseMap ? 'Replace base map' : 'Load Site Plan'}</button><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} /></div>
+            <div className="mb-6">
+              <button onClick={() => fileInputRef.current.click()} className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-600 rounded-xl hover:border-emerald-500 hover:bg-emerald-500/10 transition-all text-slate-400 hover:text-emerald-400 uppercase font-bold text-xs tracking-tighter"><ImageIcon size={16} /> {baseMap ? 'Replace base map' : 'Load Site Plan'}</button>
+              <p className="mt-2 text-[10px] text-slate-500 px-1">Roads and existing infrastructure come from your base map. Place vegetation, water, and plazas on top.</p>
+              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+            </div>
           )}
 
           {baseMap && (
@@ -1405,45 +1444,44 @@ const App = () => {
       </aside>
 
       <main className="flex-1 flex flex-col relative overflow-hidden bg-slate-950">
-        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 z-10 shadow-xl">
-          <div className="flex items-center gap-3">
+        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-4 px-6 z-10 shadow-xl shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center bg-slate-800 rounded-xl p-1 shadow-inner">
-              <button onClick={() => setViewMode('design')} className={`px-6 py-1.5 text-xs font-black rounded-lg transition-all uppercase tracking-tighter ${viewMode === 'design' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Spatial Design</button>
-              <button onClick={() => setViewMode('data')} className={`px-6 py-1.5 text-xs font-black rounded-lg transition-all uppercase tracking-tighter ${viewMode === 'data' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Costing/Technical Data</button>
+              <button onClick={() => setViewMode('design')} className={`px-5 py-1.5 text-xs font-black rounded-lg transition-all uppercase tracking-tighter ${viewMode === 'design' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Spatial Design</button>
+              <button onClick={() => setViewMode('data')} className={`px-5 py-1.5 text-xs font-black rounded-lg transition-all uppercase tracking-tighter ${viewMode === 'data' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Costing/Technical Data</button>
             </div>
             <div className="flex items-center gap-1 bg-slate-800 rounded-xl p-1 border border-slate-700">
               <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" className={`p-2 rounded-lg transition-all ${canUndo ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 cursor-not-allowed'}`}><Undo2 size={18} /></button>
               <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className={`p-2 rounded-lg transition-all ${canRedo ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 cursor-not-allowed'}`}><Redo2 size={18} /></button>
             </div>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-3 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+          <div className="flex-1 min-w-0 flex items-center justify-end gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
+            <div className="flex items-center gap-3 bg-slate-800 px-3 py-2 rounded-xl border border-slate-700 shrink-0">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Zoom</span>
-              <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-48 h-1 accent-emerald-500" />
-              <span className="text-xs font-mono font-bold w-12 text-emerald-400">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
+              <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-40 h-1 accent-emerald-500" />
+              <span className="text-xs font-mono font-bold w-10 text-emerald-400">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
             </div>
-            {/* Analysis：植被覆盖率 + 预算，移入顶栏 */}
-            <div className="flex items-center gap-4 bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700">
+            <div className="flex items-center gap-3 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 shrink-0">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Calculator size={12} /> Analysis</span>
-              <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-2.5 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <Sun size={12} className="text-amber-400" />
-                  <span className="text-slate-400">Tree</span>
+                  <Sun size={12} className="text-amber-400 shrink-0" />
+                  <span className="text-slate-400">Tree coverage</span>
                   <span className="font-mono font-bold text-white">{analysis.shadeRate.toFixed(1)}%</span>
                 </div>
                 <div className="w-px h-4 bg-slate-600" />
                 <div className="flex items-center gap-1.5">
-                  <DollarSign size={12} className="text-emerald-500" />
+                  <DollarSign size={12} className="text-emerald-500 shrink-0" />
                   <span className="text-slate-400">Budget</span>
                   <span className="font-mono font-bold text-emerald-400">${analysis.costSGD.toLocaleString()}</span>
                 </div>
                 <div className="w-px h-4 bg-slate-600" />
-                <span className={`text-[10px] font-bold ${canSubmit ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className={`text-[10px] font-bold shrink-0 ${canSubmit ? 'text-emerald-400' : 'text-amber-400'}`}>
                   {canSubmit ? '55k–80k ✓' : overCap ? 'Over 80k' : 'Below 55k'}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 shrink-0">
               {showExportButtons && (
                 <button
                   onClick={downloadJson}
@@ -1489,7 +1527,7 @@ const App = () => {
         </header>
 
         <div className="flex-1 flex min-h-0">
-          <div ref={viewportRef} className="flex-1 overflow-auto bg-[#0a0a0a] relative scrollbar-hide">
+          <div ref={viewportRef} className="flex-1 min-w-0 overflow-auto bg-[#0a0a0a] relative scrollbar-hide">
           {viewMode === 'design' ? (
             <div className="flex items-center justify-center min-w-full min-h-full" style={{ padding: '800px' }}>
               <div 
@@ -1711,25 +1749,55 @@ const App = () => {
           )}
         </div>
         {viewMode === 'design' && (
-          <aside className="w-[26rem] flex-shrink-0 border-l border-slate-800 bg-slate-900/80 flex flex-col p-3">
-            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">3D Preview</div>
-            <div className="flex-1 min-h-0 min-w-0">
-              <Preview3D elements={placedElements} canvasMetersW={canvasMetersW} canvasMetersH={canvasMetersH} />
+          <>
+            <div
+              role="separator"
+              aria-label="Resize 3D preview"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                previewResizeStartRef.current = { startX: e.clientX, startW: previewPanelWidth };
+                setPreviewResize({ active: true, startX: e.clientX, startW: previewPanelWidth });
+              }}
+              className={`flex-shrink-0 w-1.5 flex flex-col items-center justify-center border-l border-r border-slate-700 bg-slate-800 hover:bg-emerald-500/30 cursor-ew-resize transition-colors ${previewResize.active ? 'bg-emerald-500/40' : ''}`}
+            >
+              <div className="w-0.5 h-8 rounded-full bg-slate-500 pointer-events-none" />
             </div>
-          </aside>
+            <aside style={{ width: previewPanelWidth }} className="flex-shrink-0 border-l border-slate-800 bg-slate-900/80 flex flex-col p-3">
+              <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">3D Preview</div>
+              <div className="flex-1 min-h-0 min-w-0">
+                <Preview3D elements={placedElements} canvasMetersW={canvasMetersW} canvasMetersH={canvasMetersH} />
+              </div>
+            </aside>
+          </>
         )}
         </div>
 
-        <footer className="h-12 bg-slate-900 border-t border-slate-800 px-8 flex items-center justify-between text-[10px] text-slate-500 font-black uppercase tracking-widest">
-          <div className="flex gap-8 items-center">
-            <span className="flex items-center gap-2 font-bold text-emerald-500"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Engine v0.5.1</span>
-            <span className="text-slate-400">Fixed: Market-Adjusted Prices & Budget Sync</span>
+        <footer className="min-h-12 bg-slate-900 border-t border-slate-800 px-8 flex flex-col text-[10px] text-slate-500 font-black uppercase tracking-widest">
+          <div className="h-12 flex items-center justify-between">
+            <div className="flex gap-8 items-center">
+              <span className="flex items-center gap-2 font-bold text-emerald-500"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Engine v0.5.1</span>
+              <span className="text-slate-400">Fixed: Market-Adjusted Prices & Budget Sync</span>
+            </div>
+            <div className="flex gap-6 items-center text-slate-400 italic">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-400"><Calculator size={12}/> Calculations Unified</div>
+              <div className="h-4 w-px bg-slate-800"></div>
+              <span className="text-emerald-500/50 font-bold uppercase tracking-tighter">100m² Perspective</span>
+              <div className="h-4 w-px bg-slate-800"></div>
+              <button
+                type="button"
+                onClick={() => setFooterShortcutsOpen((v) => !v)}
+                className="flex items-center gap-1.5 text-slate-500 hover:text-emerald-400 transition-colors"
+              >
+                {footerShortcutsOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                <span>Shortcuts</span>
+              </button>
+            </div>
           </div>
-          <div className="flex gap-6 items-center text-slate-400 italic">
-            <div className="flex items-center gap-1.5 font-bold text-emerald-400"><Calculator size={12}/> Calculations Unified</div>
-            <div className="h-4 w-px bg-slate-800"></div>
-            <span className="text-emerald-500/50 font-bold uppercase tracking-tighter">100m² Perspective</span>
-          </div>
+          {footerShortcutsOpen && (
+            <div className="pb-3 pt-0.5 border-t border-slate-800/80 text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+              <span className="text-slate-400">Keyboard:</span> Ctrl+Z Undo · Ctrl+Y Redo · Ctrl+C Copy · Ctrl+V Paste (select component first)
+            </div>
+          )}
         </footer>
       </main>
     </div>
