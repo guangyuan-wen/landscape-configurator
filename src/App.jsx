@@ -266,6 +266,7 @@ const App = () => {
   const historyRef = useRef([]);
   const historyIndexRef = useRef(-1);
   const lastPlacedElementsRef = useRef([]);
+  const copyBufferRef = useRef(null);
 
   const [showOpenLoginBtn, setShowOpenLoginBtn] = useState(false);
 
@@ -329,17 +330,44 @@ const App = () => {
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+      const key = e.key.toLowerCase();
+      // 撤销 / 重做
+      if (e.ctrlKey && key === 'z') {
         e.preventDefault();
         undo();
-      } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+        return;
+      } else if (e.ctrlKey && key === 'y') {
         e.preventDefault();
         redo();
+        return;
+      }
+      // 复制 / 粘贴（选中组件）
+      if (e.ctrlKey && key === 'c') {
+        if (selectedIds.length === 0) return;
+        const selected = placedElements.filter(el => selectedIds.includes(el.id));
+        if (!selected.length) return;
+        copyBufferRef.current = JSON.parse(JSON.stringify(selected));
+        e.preventDefault();
+      } else if (e.ctrlKey && key === 'v') {
+        const buffer = copyBufferRef.current;
+        if (!buffer || !buffer.length) return;
+        const base = Date.now();
+        const clones = buffer.map((el, idx) => ({
+          ...el,
+          id: `elem-${base}-${idx}-${Math.random().toString(36).slice(2, 11)}`,
+          x: (el.x || 0) + 2,
+          y: (el.y || 0) + 2,
+        }));
+        const next = [...placedElements, ...clones];
+        setPlacedElements(next);
+        recordStep(next);
+        setSelectedIds(clones.map(c => c.id));
+        e.preventDefault();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [placedElements, selectedIds]);
 
   // 仅在需要时动态加载 Google 脚本，避免首屏白屏
   const loadGoogleScript = () => {
@@ -1473,6 +1501,30 @@ const App = () => {
                   backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`, border: '1px solid #374151'
                 }}
               >
+                {/* 画布内小型 Zoom 控件（方案三）——紧贴画布左下角 */}
+                <div className="pointer-events-none absolute bottom-4 left-4 z-[60]">
+                  <div className="pointer-events-auto flex items-center gap-1.5 bg-emerald-600/90 border border-emerald-400 rounded-xl px-3 py-1.5 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => setZoom(prev => Math.max(ZOOM_MIN, prev - (ZOOM_MAX - ZOOM_MIN) * 0.06))}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-500 text-white text-xs font-black"
+                      title="Zoom out"
+                    >
+                      -
+                    </button>
+                    <div className="px-1 text-[11px] font-mono text-white w-14 text-center">
+                      {Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setZoom(prev => Math.min(ZOOM_MAX, prev + (ZOOM_MAX - ZOOM_MIN) * 0.06))}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-500 text-white text-xs font-black"
+                      title="Zoom in"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 {baseMap && (
                   <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity: mapConfig.opacity }}>
                     <img
@@ -1537,12 +1589,55 @@ const App = () => {
                       )}
 
                       {isSelected && selectedIds.length === 1 && (
-                        <div className="absolute -top-14 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-800 shadow-2xl rounded-2xl p-1 border border-slate-600 ring-1 ring-white/10 z-[70]" style={{ transform: `rotate(${-el.rotation}deg)` }} onMouseDown={e => e.stopPropagation()}>
-                          <button onClick={() => duplicateElement(el.id)} className="p-2 hover:bg-emerald-600 rounded-xl text-white transition-all" title="Duplicate"><Copy size={14} /></button>
-                          {isPoly && <button onClick={() => addVertex(el.id)} className="p-2 hover:bg-emerald-600 rounded-xl text-white transition-all" title="Add Vertex"><PlusCircle size={14} /></button>}
-                          <button onClick={() => rotateElement(el.id, -15)} className="p-2 hover:bg-emerald-600 rounded-xl text-white transition-all" title="Rotate Left"><RotateCcw size={14} /></button>
-                          <button onClick={() => rotateElement(el.id, 15)} className="p-2 hover:bg-emerald-600 rounded-xl text-white transition-all" title="Rotate Right"><RotateCw size={14} /></button>
-                          <button onClick={() => { setPlacedElements(prev => { const next = prev.filter(p => !selectedIds.includes(p.id)); recordStep(next); return next; }); setSelectedIds([]); }} className="p-2 hover:bg-red-500 rounded-xl text-red-400 hover:text-white transition-all" title="Delete"><Trash size={14} /></button>
+                        <div
+                          className="absolute -top-20 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-900 shadow-2xl rounded-2xl px-3 py-2 border border-emerald-500/60 ring-1 ring-emerald-400/50 z-[70]"
+                          style={{ transform: `rotate(${-el.rotation}deg) scale(2)` }}
+                          onMouseDown={e => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => duplicateElement(el.id)}
+                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                            title="Duplicate"
+                          >
+                            <Copy size={18} />
+                          </button>
+                          {isPoly && (
+                            <button
+                              onClick={() => addVertex(el.id)}
+                              className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                              title="Add Vertex"
+                            >
+                              <PlusCircle size={18} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => rotateElement(el.id, -15)}
+                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                            title="Rotate Left"
+                          >
+                            <RotateCcw size={18} />
+                          </button>
+                          <button
+                            onClick={() => rotateElement(el.id, 15)}
+                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                            title="Rotate Right"
+                          >
+                            <RotateCw size={18} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPlacedElements(prev => {
+                                const next = prev.filter(p => !selectedIds.includes(p.id));
+                                recordStep(next);
+                                return next;
+                              });
+                              setSelectedIds([]);
+                            }}
+                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                            title="Delete"
+                          >
+                            <Trash size={18} />
+                          </button>
                         </div>
                       )}
 
