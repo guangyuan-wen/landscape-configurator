@@ -1456,10 +1456,10 @@ const App = () => {
             </div>
           </div>
           <div className="flex-1 min-w-0 flex items-center justify-end gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
-            <div className="flex items-center gap-3 bg-slate-800 px-3 py-2 rounded-xl border border-slate-700 shrink-0">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Zoom</span>
-              <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-40 h-1 accent-emerald-500" />
-              <span className="text-xs font-mono font-bold w-10 text-emerald-400">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
+            <div className="flex items-center gap-2 bg-slate-800 px-2.5 py-2 rounded-xl border border-slate-700 shrink-0">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Zoom</span>
+              <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-32 h-1 accent-emerald-500" />
+              <span className="text-xs font-mono font-bold w-9 shrink-0 text-emerald-400">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
             </div>
             <div className="flex items-center gap-3 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 shrink-0">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Calculator size={12} /> Analysis</span>
