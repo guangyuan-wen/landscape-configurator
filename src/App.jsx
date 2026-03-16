@@ -1388,11 +1388,32 @@ const App = () => {
               <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className={`p-2 rounded-lg transition-all ${canRedo ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 cursor-not-allowed'}`}><Redo2 size={18} /></button>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-3 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Zoom</span>
               <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-48 h-1 accent-emerald-500" />
               <span className="text-xs font-mono font-bold w-12 text-emerald-400">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
+            </div>
+            {/* Analysis：植被覆盖率 + 预算，移入顶栏 */}
+            <div className="flex items-center gap-4 bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Calculator size={12} /> Analysis</span>
+              <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Sun size={12} className="text-amber-400" />
+                  <span className="text-slate-400">Tree</span>
+                  <span className="font-mono font-bold text-white">{analysis.shadeRate.toFixed(1)}%</span>
+                </div>
+                <div className="w-px h-4 bg-slate-600" />
+                <div className="flex items-center gap-1.5">
+                  <DollarSign size={12} className="text-emerald-500" />
+                  <span className="text-slate-400">Budget</span>
+                  <span className="font-mono font-bold text-emerald-400">${analysis.costSGD.toLocaleString()}</span>
+                </div>
+                <div className="w-px h-4 bg-slate-600" />
+                <span className={`text-[10px] font-bold ${canSubmit ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {canSubmit ? '55k–80k ✓' : overCap ? 'Over 80k' : 'Below 55k'}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {showExportButtons && (
@@ -1548,29 +1569,6 @@ const App = () => {
                   );
                 })}
 
-                {/* Analysis Box */}
-                <div className="absolute bottom-6 right-6 z-[100] bg-slate-900/80 backdrop-blur-xl border border-emerald-500/30 rounded-3xl p-6 shadow-2xl pointer-events-none w-72" style={{ transform: `scale(${1/zoom})`, transformOrigin: 'bottom right' }}>
-                  <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-700/50"><Calculator className="text-emerald-400" size={18} /><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Analysis</h4></div>
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-1.5 mb-1"><Sun size={12} className="text-amber-400" /><span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Tree coverage percentage</span></div>
-                      <div className="flex justify-between items-end"><span className="text-lg font-mono font-black text-white">{analysis.shadeRate.toFixed(1)}%</span></div>
-                      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all duration-700" style={{ width: `${Math.min(100, analysis.shadeRate)}%` }} /></div>
-                    </div>
-                    <div className="space-y-2 pt-2 border-t border-slate-700/30">
-                      <div className="flex items-center gap-1.5 mb-1"><DollarSign size={12} className="text-emerald-500" /><span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Budget (SGD)</span></div>
-                      <div className="flex justify-between items-center bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
-                        <span className="text-lg font-mono font-black text-emerald-400">${analysis.costSGD.toLocaleString()}</span>
-                      </div>
-                      <div className="text-[9px] text-slate-500">
-                        Submit allowed: {(SUBMIT_MIN_SGD / 1000).toFixed(0)}k–{(SUBMIT_MAX_SGD / 1000).toFixed(0)}k SGD only (below 55k or above 80k = cannot submit)
-                      </div>
-                      <div className={`text-[10px] font-bold ${canSubmit ? 'text-emerald-400' : 'text-amber-400'}`}>
-                        {canSubmit ? 'Within 55k–80k — submit enabled' : overCap ? 'Over 80k — cannot submit' : 'Below 55k — cannot submit'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           ) : (
