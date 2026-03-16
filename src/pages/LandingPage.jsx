@@ -101,7 +101,7 @@ export default function LandingPage() {
             </Link>
           </div>
           <div className="w-full aspect-video rounded-2xl overflow-hidden border border-slate-700 bg-slate-900/50 mt-8 shadow-2xl ring-1 ring-slate-700/50">
-            <img src="/Web-tool-ScreenShot.png" alt="LandscapePro web tool interface" className="w-full h-full object-contain" />
+            <img src="/Web-tool-ScreenShot.jpg" alt="LandscapePro web tool interface" className="w-full h-full object-contain" />
           </div>
         </section>
 
