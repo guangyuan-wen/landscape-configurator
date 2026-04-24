@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Outlines } from '@react-three/drei';
 import * as THREE from 'three';
 
 // Lightweight 3D preview: map 2D canvas elements to simple meshes.
@@ -9,12 +9,46 @@ import * as THREE from 'three';
 
 // Layer Y 分层：从低到高 grass → 广场 → playground → fitness → 路径 → 水体（水体最高）
 const LAYER_GRASS = 0.02;
-const LAYER_PLAZA = 0.045;   // 广场 最低
-const LAYER_PLAY = 0.07;     // playground
-const LAYER_FITNESS = 0.10;  // outdoor gym
-const LAYER_PATH = 0.13;     // court-l (路径) 第二高
-const LAYER_WATER = 0.16;    // water feature、pond、水体 最高
+const LAYER_PLAZA = 0.045;
+const LAYER_PLAY = 0.07;
+const LAYER_FITNESS = 0.10;
+const LAYER_PATH = 0.13;
+const LAYER_WATER = 0.16;
 const COMMUNITY_HUB_HEIGHT = 2.5;
+
+/**
+ * 手绘水彩色——与 App.jsx 中 DISPLAY_COLORS 保持视觉统一。
+ * 注：不改 LIBRARY.color（JSON 导出字段仍维持原值），仅 3D / 2D 显示使用这里。
+ */
+const DISPLAY_COLORS = {
+  'tree-small':    '#b9d59a',
+  'tree-medium':   '#8bb36a',
+  'tree-large':    '#5c8a49',
+  'shrub-small':   '#c5d89b',
+  'shrub-medium':  '#a7c17d',
+  'shrub-large':   '#8fa95e',
+  'grass-organic': '#c9dcac',
+  'grass':         '#d0dfb3',
+  'water-organic': '#a7c7d6',
+  'pond-circular': '#b9d3df',
+  'fountain':      '#9dbfce',
+  'bench':         '#d4a373',
+  'table':         '#c58e57',
+  'lamp':          '#e6cf87',
+  'trash':         '#bfb7a8',
+  'bike':          '#a8a192',
+  'plaza-rect':    '#e8dfc6',
+  'plaza-circle':  '#d8c9a7',
+  'court-l':       '#c9b892',
+  'play-area':     '#e6c285',
+  'fitness':       '#c7a7d1',
+};
+const getDisplayColor = (el) => (el && DISPLAY_COLORS[el.type]) || el?.color || '#b9d59a';
+
+const OUTLINE_COLOR = '#2a2824';
+const OUTLINE_THICKNESS = 0.04; // 相对 toon 外壳的厚度（单位 ≈ 米，足以形成明显黑线但不堵塞小物件）
+/** 开关：用户可在 .env 设 VITE_3D_OUTLINE=false 关掉描边，兜底低端显卡 */
+const OUTLINE_ENABLED = import.meta.env?.VITE_3D_OUTLINE !== 'false';
 
 function getLayerY(el) {
   const t = el.type;
@@ -23,7 +57,7 @@ function getLayerY(el) {
   if (t === 'play-area') return LAYER_PLAY;
   if (t === 'fitness') return LAYER_FITNESS;
   if (['plaza-rect', 'plaza-circle'].includes(t)) return LAYER_PLAZA;
-  return LAYER_GRASS; // grass, grass-organic, polygon lawn, 及其他
+  return LAYER_GRASS;
 }
 
 function hexToThreeColor(hex) {
@@ -70,14 +104,18 @@ function getLShapeDefaultVertices(w, h) {
   ];
 }
 
+/** 小工具：根据厚度渲染黑色描边（低端显卡可关闭） */
+const ToonOutline = ({ thickness = OUTLINE_THICKNESS }) => (
+  OUTLINE_ENABLED ? <Outlines thickness={thickness} color={OUTLINE_COLOR} angle={0} /> : null
+);
+
 function ElementMesh({ el, cx, cy }) {
   const w = el.width || 1;
   const h = el.height || 1;
-  // 2D 使用左上角 (el.x, el.y)，3D 的 plane 以中心为原点，故用 2D 中心对齐避免整体偏左/偏上
   const x = (el.x + w / 2) - cx;
   const z = (el.y + h / 2) - cy;
   const rotY = (-el.rotation * Math.PI) / 180;
-  const color = el.color ? hexToThreeColor(el.color) : new THREE.Color('#888');
+  const color = hexToThreeColor(getDisplayColor(el));
   const isTree = /^tree-/.test(el.type);
   const isShrub = /^shrub-/.test(el.type);
   const isFountain = el.type === 'fountain';
@@ -85,7 +123,6 @@ function ElementMesh({ el, cx, cy }) {
   const isCommunityHub = el.type === 'plaza-circle';
   const isFlat = ['grass', 'grass-organic', 'water-organic', 'water-area', 'pond-circular', 'reflecting-pool', 'plaza-rect', 'plaza-circle', 'court-l', 'play-area', 'fitness'].includes(el.type) || el.shape === 'organic' || el.shape === 'polygon';
 
-  // Community Hub only: building height (cylinder)
   if (isCommunityHub) {
     const r = Math.max(w, h) / 2;
     const layerY = getLayerY(el);
@@ -93,7 +130,8 @@ function ElementMesh({ el, cx, cy }) {
       <group position={[x, layerY + COMMUNITY_HUB_HEIGHT / 2, z]} rotation={[0, rotY, 0]}>
         <mesh castShadow receiveShadow>
           <cylinderGeometry args={[r, r, COMMUNITY_HUB_HEIGHT, 16]} />
-          <meshStandardMaterial color={color} />
+          <meshToonMaterial color={color} />
+          <ToonOutline thickness={0.06} />
         </mesh>
       </group>
     );
@@ -106,11 +144,13 @@ function ElementMesh({ el, cx, cy }) {
       <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
         <mesh position={[0, trunkH / 2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[w * 0.08, w * 0.12, trunkH, 6]} />
-          <meshStandardMaterial color="#5d4e37" />
+          <meshToonMaterial color="#6b4f2f" />
+          <ToonOutline thickness={0.03} />
         </mesh>
         <mesh position={[0, trunkH + foliageR * 0.6, 0]} castShadow>
           <sphereGeometry args={[foliageR, 6, 5]} />
-          <meshStandardMaterial color={color} />
+          <meshToonMaterial color={color} />
+          <ToonOutline thickness={0.05} />
         </mesh>
       </group>
     );
@@ -122,7 +162,8 @@ function ElementMesh({ el, cx, cy }) {
       <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
         <mesh position={[0, r * 0.6, 0]} castShadow>
           <sphereGeometry args={[r, 6, 5]} />
-          <meshStandardMaterial color={color} />
+          <meshToonMaterial color={color} />
+          <ToonOutline thickness={0.03} />
         </mesh>
       </group>
     );
@@ -133,11 +174,13 @@ function ElementMesh({ el, cx, cy }) {
       <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
         <mesh position={[0, 0.2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[w * 0.4, w * 0.45, 0.4, 12]} />
-          <meshStandardMaterial color={color} />
+          <meshToonMaterial color={color} />
+          <ToonOutline thickness={0.03} />
         </mesh>
         <mesh position={[0, 0.8, 0]} castShadow>
           <sphereGeometry args={[w * 0.2, 6, 5]} />
-          <meshStandardMaterial color="#e0f2fe" />
+          <meshToonMaterial color="#d6e8ef" />
+          <ToonOutline thickness={0.03} />
         </mesh>
       </group>
     );
@@ -148,11 +191,13 @@ function ElementMesh({ el, cx, cy }) {
       <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
         <mesh position={[0, 0.5, 0]} castShadow>
           <cylinderGeometry args={[0.08, 0.1, 1, 8]} />
-          <meshStandardMaterial color="#78716c" />
+          <meshToonMaterial color="#78716c" />
+          <ToonOutline thickness={0.02} />
         </mesh>
         <mesh position={[0, 1.1, 0]} castShadow>
           <sphereGeometry args={[0.2, 6, 5]} />
-          <meshStandardMaterial color="#fef08a" emissive="#fef08a" emissiveIntensity={0.3} />
+          <meshToonMaterial color="#e6cf87" emissive="#e6cf87" emissiveIntensity={0.25} />
+          <ToonOutline thickness={0.02} />
         </mesh>
       </group>
     );
@@ -177,7 +222,7 @@ function ElementMesh({ el, cx, cy }) {
           ) : (
             <planeGeometry args={[sx, sz]} />
           )}
-          <meshStandardMaterial color={color} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-2} />
+          <meshToonMaterial color={color} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-2} />
         </mesh>
       </group>
     );
@@ -189,7 +234,8 @@ function ElementMesh({ el, cx, cy }) {
     <group position={[x, boxH / 2, z]} rotation={[0, rotY, 0]}>
       <mesh castShadow receiveShadow>
         <boxGeometry args={[w, boxH, h]} />
-        <meshStandardMaterial color={color} />
+        <meshToonMaterial color={color} />
+        <ToonOutline thickness={0.03} />
       </mesh>
     </group>
   );
@@ -200,7 +246,6 @@ function Scene({ elements, canvasMetersW, canvasMetersH }) {
   const cy = canvasMetersH / 2;
   const ext = Math.max(canvasMetersW, canvasMetersH) * 0.6;
 
-  // 按层级从低到高绘制，减少 z-fight（顺序：grass/其他 → 广场 → playground → fitness → 路径 → 水体）
   const sorted = useMemo(() => {
     const order = (el) => {
       const t = el.type;
@@ -216,11 +261,12 @@ function Scene({ elements, canvasMetersW, canvasMetersH }) {
 
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[ext, ext * 1.2, ext]} intensity={0.9} castShadow shadow-mapSize={[512, 512]} shadow-camera-far={500} shadow-camera-left={-80} shadow-camera-right={80} shadow-camera-top={80} shadow-camera-bottom={-80} />
+      {/* 柔和环境光 + 暖色主光，保留 toon 层次不被强光洗掉 */}
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[ext, ext * 1.2, ext]} intensity={0.55} castShadow shadow-mapSize={[512, 512]} shadow-camera-far={500} shadow-camera-left={-80} shadow-camera-right={80} shadow-camera-top={80} shadow-camera-bottom={-80} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
         <planeGeometry args={[canvasMetersW + 20, canvasMetersH + 20]} />
-        <meshStandardMaterial color="#cccccc" />
+        <meshToonMaterial color="#e8dfc6" />
       </mesh>
       {sorted.map((el) => (
         <ElementMesh key={el.id} el={el} cx={cx} cy={cy} />
@@ -236,13 +282,21 @@ export default function Preview3D({ elements, canvasMetersW, canvasMetersH }) {
   const cameraPos = useMemo(() => [w * 0.4, h * 0.5, h * 0.6], [w, h]);
 
   return (
-    <div className="w-full h-full min-h-[280px] bg-slate-900 rounded-xl overflow-hidden border border-slate-700">
+    <div
+      className="w-full h-full min-h-[280px] rounded-xl overflow-hidden"
+      style={{
+        backgroundColor: '#faf6ec',
+        border: '1.5px solid #2a2824',
+        boxShadow: '2px 3px 0 rgba(42,40,36,0.15)',
+      }}
+    >
       <Canvas
         camera={{ position: cameraPos, fov: 45, near: 0.5, far: 800 }}
         shadows
         gl={{ antialias: true, powerPreference: 'low-power', stencil: false, depth: true }}
         dpr={[1, 1.5]}
         frameloop="always"
+        style={{ background: '#faf6ec' }}
       >
         <Scene elements={elements} canvasMetersW={w} canvasMetersH={h} />
       </Canvas>

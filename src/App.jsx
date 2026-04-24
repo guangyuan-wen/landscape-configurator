@@ -82,6 +82,36 @@ const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
 /** 默认用户版（仅 Submit）。需完整版时设 VITE_SHOW_EXPORT_BUTTONS=true，显示 Download JSON 与 Upload to Google Drive */
 const showExportButtons = import.meta.env.VITE_SHOW_EXPORT_BUTTONS === 'true' || import.meta.env.VITE_SHOW_EXPORT_BUTTONS === '1';
 
+/**
+ * 画布显示用的"水彩低饱和"色。不改 LIBRARY.color（JSON 导出字段仍维持原值），
+ * 渲染时若存在 DISPLAY_COLORS[type] 则优先采用，保证 2D / 3D 视觉统一。
+ */
+const DISPLAY_COLORS = {
+  'tree-small':    '#b9d59a',
+  'tree-medium':   '#8bb36a',
+  'tree-large':    '#5c8a49',
+  'shrub-small':   '#c5d89b',
+  'shrub-medium':  '#a7c17d',
+  'shrub-large':   '#8fa95e',
+  'grass-organic': '#c9dcac',
+  'grass':         '#d0dfb3',
+  'water-organic': '#a7c7d6',
+  'pond-circular': '#b9d3df',
+  'fountain':      '#9dbfce',
+  'bench':         '#d4a373',
+  'table':         '#c58e57',
+  'lamp':          '#e6cf87',
+  'trash':         '#bfb7a8',
+  'bike':          '#a8a192',
+  'plaza-rect':    '#e8dfc6',
+  'plaza-circle':  '#d8c9a7',
+  'court-l':       '#c9b892',
+  'play-area':     '#e6c285',
+  'fitness':       '#c7a7d1',
+};
+/** 元素的显示色（水彩），fallback 到原 LIBRARY.color */
+const getDisplayColor = (el) => (el && DISPLAY_COLORS[el.type]) || el?.color || '#b9d59a';
+
 const LIBRARY = {
   VEGETATION: [
     { type: 'tree-small', name: 'Small Tree', width: 3, height: 3, color: '#4ade80', icon: '🌳', shape: 'circle', isShading: true, unitPrice: 220 },
@@ -199,20 +229,20 @@ const getElementArea = (el) => {
 
 const SidebarSection = ({ title, icon: Icon, children, id, isOpen, onToggle }) => {
   return (
-    <div className="mb-4">
-      <button 
+    <div className="mb-3">
+      <button
         onClick={() => onToggle(id)}
-        className={`flex items-center justify-between w-full px-4 py-2.5 text-[11px] font-black rounded-lg transition-all uppercase tracking-wider ${
-          isOpen ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-50/5 text-slate-500 hover:bg-slate-100/5'
+        className={`flex items-center justify-between w-full px-3 py-2.5 text-[13px] font-display font-bold rounded-md transition-all tracking-wide ${
+          isOpen ? 'text-brand border-b-2 border-brand/70' : 'text-ink hover:text-brand border-b border-ink/20'
         }`}
       >
         <div className="flex items-center gap-2">
-          <Icon size={14} className={isOpen ? 'text-emerald-400' : 'text-slate-400'} />
+          <Icon size={16} className={isOpen ? 'text-brand' : 'text-ink'} />
           {title}
         </div>
-        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </button>
-      {isOpen && <div className="p-2 grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-top-2 duration-200">{children}</div>}
+      {isOpen && <div className="p-1.5 grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-top-2 duration-200">{children}</div>}
     </div>
   );
 };
@@ -1233,40 +1263,40 @@ const App = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-900 font-sans overflow-hidden text-slate-200 select-none">
+    <div className="flex h-screen w-full bg-paper font-display overflow-hidden text-ink select-none">
       {/* Submit 前意见弹窗：可选填写反馈后再提交 */}
       {showFeedbackModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-          <div className="bg-slate-800 border-2 border-sky-500/60 text-white px-8 py-6 rounded-2xl shadow-2xl max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200 relative">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/40">
+          <div className="sketch-card text-ink px-8 py-6 max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200 relative" style={{ boxShadow: '4px 6px 0 rgba(42,40,36,0.18)' }}>
             <button
               type="button"
               onClick={() => { setShowFeedbackModal(false); setFeedbackInput(''); }}
-              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-600 transition-all"
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-ink-soft hover:text-brand hover:bg-paper-3 transition-all"
               aria-label="Close"
             >
               <X size={20} />
             </button>
-            <div className="text-sky-400 mb-2 text-sm font-black uppercase tracking-wider">Feedback (optional)</div>
-            <p className="text-slate-200 text-left mb-3">Do you have any feedback on this interaction?</p>
+            <div className="text-brand mb-2 text-base font-display font-bold tracking-wide">Feedback (optional)</div>
+            <p className="text-ink text-left mb-3 font-hand text-lg">Do you have any feedback on this interaction?</p>
             <textarea
               value={feedbackInput}
               onChange={(e) => setFeedbackInput(e.target.value)}
               placeholder="Optional — you can submit without typing anything"
               rows={4}
-              className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-y mb-4"
+              className="w-full bg-paper border border-ink/30 rounded-lg px-4 py-3 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:border-brand resize-y mb-4"
             />
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => { setShowFeedbackModal(false); setFeedbackInput(''); }}
-                className="flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase bg-slate-600 hover:bg-slate-500 text-slate-200 transition-all"
+                className="sketch-btn flex-1 py-2.5 px-4 font-display font-bold text-sm"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => submitWithFeedback(feedbackInput)}
-                className="flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase bg-sky-600 hover:bg-sky-500 text-white transition-all"
+                className="sketch-btn-brand flex-1 py-2.5 px-4 font-display font-bold text-sm"
               >
                 Submit
               </button>
@@ -1277,206 +1307,223 @@ const App = () => {
 
       {/* 上传状态：中央醒目提示，确保用户能看到 */}
       {uploadStatus && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-          <div className="bg-slate-800 border-2 border-emerald-500/60 text-white px-8 py-6 rounded-2xl shadow-2xl text-center max-w-md animate-in fade-in zoom-in duration-200 relative">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/40">
+          <div className="sketch-card text-ink px-8 py-6 text-center max-w-md animate-in fade-in zoom-in duration-200 relative" style={{ boxShadow: '4px 6px 0 rgba(42,40,36,0.18)' }}>
             <button
               type="button"
               onClick={() => { setUploadStatus(null); setShowOpenLoginBtn(false); setIsExporting(false); }}
-              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-600 transition-all"
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-ink-soft hover:text-brand hover:bg-paper-3 transition-all"
               aria-label="Close"
             >
               <X size={20} />
             </button>
-            <div className="text-emerald-400 mb-2 text-sm font-black uppercase tracking-wider">Status</div>
-            <div className="text-lg font-bold">{uploadStatus}</div>
+            <div className="text-brand mb-2 text-base font-display font-bold tracking-wide">Status</div>
+            <div className="text-lg font-hand">{uploadStatus}</div>
             {showOpenLoginBtn && (
               <button
                 type="button"
                 onClick={openGoogleLoginPopup}
-                className="mt-4 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm uppercase rounded-xl transition-all"
+                className="sketch-btn-brand mt-4 w-full py-3 px-4 font-display font-bold text-sm"
               >
                 Open Google sign-in window
               </button>
             )}
-            {isExporting && !showOpenLoginBtn && <div className="mt-3 h-1 w-32 bg-slate-700 rounded-full overflow-hidden mx-auto"><div className="h-full bg-emerald-500 animate-pulse w-2/3 rounded-full" /></div>}
+            {isExporting && !showOpenLoginBtn && <div className="mt-3 h-1 w-32 bg-paper-4 rounded-full overflow-hidden mx-auto"><div className="h-full bg-brand animate-pulse w-2/3 rounded-full" /></div>}
           </div>
         </div>
       )}
-      <aside className="w-80 h-full bg-slate-800 border-r border-slate-700 shadow-2xl z-20 overflow-y-auto flex flex-col min-w-[20rem]" style={{ scrollbarGutter: 'stable' }}>
-        <div className="p-6 border-b border-slate-700 bg-slate-900/50">
-          <h1 className="text-lg font-black flex items-center gap-2 text-emerald-400 uppercase tracking-tighter">
-            <MapIcon size={20} />
-            LandscapePro <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">0.5.1</span>
+      <aside className="w-80 h-full bg-paper-3 border-r border-ink/25 shadow-2xl z-20 overflow-y-auto flex flex-col min-w-[20rem]" style={{ scrollbarGutter: 'stable' }}>
+        <div className="p-5 border-b border-ink/30 bg-paper-2">
+          <h1 className="text-2xl font-display font-bold flex items-center gap-2 text-ink tracking-tight">
+            <MapIcon size={22} className="text-brand" />
+            LandscapePro <span className="text-[10px] font-hand text-brand px-1.5 py-0.5 rounded">v0.5.1</span>
           </h1>
         </div>
 
         <div className="p-4 flex-1">
           {selectedIds.length > 1 ? (
-            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl animate-in slide-in-from-left duration-300">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2"><MousePointer2 size={12} /> {selectedIds.length} selected</h3>
-                <button onClick={() => setSelectedIds([])} className="text-slate-500 hover:text-white bg-slate-900 p-1 rounded-full"><X size={14} /></button>
+            <div className="sketch-border-red mb-5 p-4 animate-in slide-in-from-left duration-300">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-display font-bold text-brand flex items-center gap-2"><MousePointer2 size={14} /> {selectedIds.length} selected</h3>
+                <button onClick={() => setSelectedIds([])} className="text-ink-soft hover:text-brand p-1 rounded-full"><X size={14} /></button>
               </div>
-              <p className="text-[10px] text-slate-400 mb-3">Drag any selected component to move all together.</p>
-              <button onClick={() => { setPlacedElements(prev => { const next = prev.filter(p => !selectedIds.includes(p.id)); recordStep(next); return next; }); setSelectedIds([]); }} className="w-full py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-red-500/20">Delete selected</button>
+              <p className="text-[12px] font-hand text-ink-soft mb-3">Drag any selected component to move them together.</p>
+              <button onClick={() => { setPlacedElements(prev => { const next = prev.filter(p => !selectedIds.includes(p.id)); recordStep(next); return next; }); setSelectedIds([]); }} className="sketch-btn-brand w-full py-2 text-[12px] font-display font-bold">Delete selected</button>
             </div>
           ) : selectedElement ? (
-            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl animate-in slide-in-from-left duration-300">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2"><MousePointer2 size={12} /> Tech Specs</h3>
-                <button onClick={() => setSelectedIds([])} className="text-slate-500 hover:text-white bg-slate-900 p-1 rounded-full"><X size={14} /></button>
+            <div className="sketch-border-red mb-5 p-4 animate-in slide-in-from-left duration-300">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-display font-bold text-brand flex items-center gap-2"><MousePointer2 size={14} /> Tech Specs</h3>
+                <button onClick={() => setSelectedIds([])} className="text-ink-soft hover:text-brand p-1 rounded-full"><X size={14} /></button>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[8px] font-bold text-slate-500 uppercase italic">X Position</label><input type="number" step="0.1" value={selectedElement.x} onChange={(e) => updateElementProp(selectedId, 'x', parseFloat(e.target.value))} className="w-full bg-slate-900 text-xs font-mono p-2 rounded border border-slate-700 text-emerald-400 outline-none" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-bold text-slate-500 uppercase italic">Y Position</label><input type="number" step="0.1" value={selectedElement.y} onChange={(e) => updateElementProp(selectedId, 'y', parseFloat(e.target.value))} className="w-full bg-slate-900 text-xs font-mono p-2 rounded border border-slate-700 text-emerald-400 outline-none" /></div>
+                  <div className="space-y-1"><label className="text-[10px] font-display font-bold text-ink-soft">X Position</label><input type="number" step="0.1" value={selectedElement.x} onChange={(e) => updateElementProp(selectedId, 'x', parseFloat(e.target.value))} className="w-full bg-paper text-xs font-mono p-2 rounded-md border border-ink/30 text-ink outline-none focus:border-brand" /></div>
+                  <div className="space-y-1"><label className="text-[10px] font-display font-bold text-ink-soft">Y Position</label><input type="number" step="0.1" value={selectedElement.y} onChange={(e) => updateElementProp(selectedId, 'y', parseFloat(e.target.value))} className="w-full bg-paper text-xs font-mono p-2 rounded-md border border-ink/30 text-ink outline-none focus:border-brand" /></div>
                 </div>
-                
-                <div className="relative pt-2">
+
+                <div className="relative pt-1">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1"><label className="text-[8px] font-bold text-slate-500 uppercase">Width (m)</label><input type="number" step="0.1" value={selectedElement.width} onChange={(e) => updateElementProp(selectedId, 'width', parseFloat(e.target.value))} className="w-full bg-slate-900 text-xs font-mono p-2 rounded border border-slate-700 outline-none" /></div>
-                    <div className="space-y-1"><label className="text-[8px] font-bold text-slate-500 uppercase">Height (m)</label><input type="number" step="0.1" value={selectedElement.height} onChange={(e) => updateElementProp(selectedId, 'height', parseFloat(e.target.value))} className="w-full bg-slate-900 text-xs font-mono p-2 rounded border border-slate-700 outline-none" /></div>
+                    <div className="space-y-1"><label className="text-[10px] font-display font-bold text-ink-soft">Width (m)</label><input type="number" step="0.1" value={selectedElement.width} onChange={(e) => updateElementProp(selectedId, 'width', parseFloat(e.target.value))} className="w-full bg-paper text-xs font-mono p-2 rounded-md border border-ink/30 outline-none focus:border-brand" /></div>
+                    <div className="space-y-1"><label className="text-[10px] font-display font-bold text-ink-soft">Height (m)</label><input type="number" step="0.1" value={selectedElement.height} onChange={(e) => updateElementProp(selectedId, 'height', parseFloat(e.target.value))} className="w-full bg-paper text-xs font-mono p-2 rounded-md border border-ink/30 outline-none focus:border-brand" /></div>
                   </div>
-                  <button onClick={() => updateElementProp(selectedId, 'aspectLocked', !selectedElement.aspectLocked)} className={`absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-[2px] p-1.5 rounded-full z-10 border transition-all ${selectedElement.aspectLocked ? 'bg-emerald-600 border-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}><LinkIcon size={10} /></button>
+                  <button onClick={() => updateElementProp(selectedId, 'aspectLocked', !selectedElement.aspectLocked)} className={`absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-[2px] p-1.5 rounded-full z-10 border-2 transition-all ${selectedElement.aspectLocked ? 'bg-brand border-ink text-paper' : 'bg-paper border-ink/50 text-ink-soft'}`}><LinkIcon size={10} /></button>
                 </div>
-                
+
                 <div>
-                  <div className="flex justify-between mb-1.5 items-center text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                  <div className="flex justify-between mb-1.5 items-center text-[11px] font-display font-bold text-ink-soft">
                     <label>Rotation</label>
-                    <span className="text-emerald-400 font-mono">{selectedElement.rotation}°</span>
+                    <span className="text-brand font-mono">{selectedElement.rotation}°</span>
                   </div>
-                  <input type="range" min="0" max="360" value={selectedElement.rotation} onChange={(e) => updateElementProp(selectedId, 'rotation', parseInt(e.target.value))} className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+                  <input type="range" min="0" max="360" value={selectedElement.rotation} onChange={(e) => updateElementProp(selectedId, 'rotation', parseInt(e.target.value))} className="w-full h-1.5 bg-paper-4 rounded-lg appearance-none cursor-pointer accent-brand" />
                 </div>
-                <button onClick={() => { setPlacedElements(prev => { const next = prev.filter(p => !selectedIds.includes(p.id)); recordStep(next); return next; }); setSelectedIds([]); }} className="w-full py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-red-500/20">Delete Component</button>
+                <button onClick={() => { setPlacedElements(prev => { const next = prev.filter(p => !selectedIds.includes(p.id)); recordStep(next); return next; }); setSelectedIds([]); }} className="sketch-btn-brand w-full py-2 text-[12px] font-display font-bold">Delete Component</button>
               </div>
             </div>
           ) : (
-            <div className="mb-6">
-              <button onClick={() => fileInputRef.current.click()} className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-600 rounded-xl hover:border-emerald-500 hover:bg-emerald-500/10 transition-all text-slate-400 hover:text-emerald-400 uppercase font-bold text-xs tracking-tighter"><ImageIcon size={16} /> {baseMap ? 'Replace base map' : 'Load Site Plan'}</button>
-              <p className="mt-2 text-[10px] text-slate-500 px-1">Roads and existing infrastructure come from your base map. Place vegetation, water, and plazas on top.</p>
+            <div className="mb-5">
+              <button onClick={() => fileInputRef.current.click()} className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-ink/40 rounded-xl hover:border-brand hover:bg-brand/10 transition-all text-ink-soft hover:text-brand font-display font-bold text-sm"><ImageIcon size={16} /> {baseMap ? 'Replace base map' : 'Load Site Plan'}</button>
+              <p className="mt-2 text-[11px] font-hand text-ink-soft px-1">Roads and existing infrastructure come from your base map. Place vegetation, water, and plazas on top.</p>
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
             </div>
           )}
 
           {baseMap && (
             <SidebarSection title="Calibration" icon={Settings2} id="MAP" isOpen={openSectionIds.includes('MAP')} onToggle={toggleSection}>
-              <div className="space-y-4 px-1 py-1">
-                <div><label className="text-[9px] font-bold text-slate-400 uppercase block mb-2">Scale (x)</label><input type="range" min="0.1" max="5" step="0.01" value={mapConfig.scale} onChange={(e) => setMapConfig({...mapConfig, scale: parseFloat(e.target.value)})} className="w-full h-1 bg-slate-700 rounded-lg accent-emerald-500" disabled={mapConfig.isLocked} /></div>
-                <div><label className="text-[9px] font-bold text-slate-400 uppercase block mb-2">Opacity</label><input type="range" min="0" max="1" step="0.1" value={mapConfig.opacity} onChange={(e) => setMapConfig({...mapConfig, opacity: parseFloat(e.target.value)})} className="w-full h-1 bg-slate-700 rounded-lg accent-slate-500" /></div>
-                <button onClick={() => setMapConfig({...mapConfig, isLocked: !mapConfig.isLocked})} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase shadow-xl transition-all ${mapConfig.isLocked ? 'bg-slate-700 text-slate-300' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'}`}>{mapConfig.isLocked ? "Unlock Map Edit" : "Lock Map Position"}</button>
-                <button onClick={() => { centerMapInViewport(); requestAnimationFrame(centerMapInViewport); }} className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase shadow-xl transition-all bg-sky-500/20 text-sky-400 border border-sky-500/50 hover:bg-sky-500/30">Center Map in View</button>
-                <button onClick={() => { clearInteractionState(); recordStep([]); setPlacedElements([]); setSelectedIds([]); }} disabled={placedElements.length === 0} className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase shadow-xl transition-all bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500/20">Clear All Components</button>
+              <div className="space-y-3 px-1 py-1">
+                <div><label className="text-[11px] font-display font-bold text-ink-soft block mb-1.5">Scale (x)</label><input type="range" min="0.1" max="5" step="0.01" value={mapConfig.scale} onChange={(e) => setMapConfig({...mapConfig, scale: parseFloat(e.target.value)})} className="w-full h-1.5 bg-paper-4 rounded-lg accent-brand" disabled={mapConfig.isLocked} /></div>
+                <div><label className="text-[11px] font-display font-bold text-ink-soft block mb-1.5">Opacity</label><input type="range" min="0" max="1" step="0.1" value={mapConfig.opacity} onChange={(e) => setMapConfig({...mapConfig, opacity: parseFloat(e.target.value)})} className="w-full h-1.5 bg-paper-4 rounded-lg accent-brand" /></div>
+                <button onClick={() => setMapConfig({...mapConfig, isLocked: !mapConfig.isLocked})} className={`sketch-btn w-full py-2 text-[12px] font-display font-bold ${mapConfig.isLocked ? '' : '!bg-brand/15 !border-brand text-brand'}`}>{mapConfig.isLocked ? "Unlock Map Edit" : "Lock Map Position"}</button>
+                <button onClick={() => { centerMapInViewport(); requestAnimationFrame(centerMapInViewport); }} className="sketch-btn w-full py-2 text-[12px] font-display font-bold">Center Map in View</button>
+                <button onClick={() => { clearInteractionState(); recordStep([]); setPlacedElements([]); setSelectedIds([]); }} disabled={placedElements.length === 0} className="sketch-btn w-full py-2 text-[12px] font-display font-bold !text-brand-deep disabled:opacity-50 disabled:cursor-not-allowed">Clear All Components</button>
               </div>
             </SidebarSection>
           )}
 
           <SidebarSection title="Template" icon={LayoutTemplate} id="TEMPLATE" isOpen={openSectionIds.includes('TEMPLATE')} onToggle={toggleSection}>
-            <p className="text-[9px] text-slate-500 mb-3 px-1">Load a pre-designed layout. You can then drag more components on top.</p>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/community-park1.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🏘️</span> Community Park 1</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/community-park2.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🏘️</span> Community Park 2</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/community-park3.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🏘️</span> Community Park 3</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/urban-park1.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🏛️</span> Urban Park 1</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/urban-park2.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🏛️</span> Urban Park 2</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/urban-park3.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🏛️</span> Urban Park 3</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/nature-park1.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🌲</span> Nature Park 1</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/nature-park2.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🌲</span> Nature Park 2</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => loadBuiltInTemplate('/templates/nature-park3.json')} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><span>🌲</span> Nature Park 3</span>
-              <LayoutTemplate size={14} className="text-slate-500" />
-            </button>
-            <button type="button" onClick={() => templateFileInputRef.current?.click()} className="w-full flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:border-emerald-500 transition-all text-left mt-2">
-              <span className="text-[11px] font-bold text-slate-200 flex items-center gap-2"><FolderOpen size={14} /> Load from file…</span>
+            <p className="text-[11px] font-hand text-ink-soft mb-2 px-1">Pick a pre-designed layout, then drag more components on top.</p>
+            {[
+              { path: '/templates/community-park1.json', name: 'Community Park 1', emoji: '🏘️' },
+              { path: '/templates/community-park2.json', name: 'Community Park 2', emoji: '🏘️' },
+              { path: '/templates/community-park3.json', name: 'Community Park 3', emoji: '🏘️' },
+              { path: '/templates/urban-park1.json', name: 'Urban Park 1', emoji: '🏛️' },
+              { path: '/templates/urban-park2.json', name: 'Urban Park 2', emoji: '🏛️' },
+              { path: '/templates/urban-park3.json', name: 'Urban Park 3', emoji: '🏛️' },
+              { path: '/templates/nature-park1.json', name: 'Nature Park 1', emoji: '🌲' },
+              { path: '/templates/nature-park2.json', name: 'Nature Park 2', emoji: '🌲' },
+              { path: '/templates/nature-park3.json', name: 'Nature Park 3', emoji: '🌲' },
+            ].map((t) => (
+              <button key={t.path} type="button" onClick={() => loadBuiltInTemplate(t.path)} className="sketch-btn w-full flex items-center justify-between p-2.5 text-left mb-1.5 text-[12px] font-display">
+                <span className="flex items-center gap-2 text-ink"><span>{t.emoji}</span> {t.name}</span>
+                <LayoutTemplate size={14} className="text-ink-soft" />
+              </button>
+            ))}
+            <button type="button" onClick={() => templateFileInputRef.current?.click()} className="sketch-btn w-full flex items-center justify-between p-2.5 text-left text-[12px] font-display">
+              <span className="flex items-center gap-2 text-ink"><FolderOpen size={14} /> Load from file…</span>
             </button>
             <input ref={templateFileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleTemplateFileSelect} />
           </SidebarSection>
 
           <SidebarSection title="Vegetation" icon={Trees} id="VEGETATION" isOpen={openSectionIds.includes('VEGETATION')} onToggle={toggleSection}>
-            {LIBRARY.VEGETATION.map(item => (
-              <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-emerald-500 transition-all group shadow-sm">
-                <div className="flex items-center gap-3"><span className="text-xl drop-shadow-md">{item.icon}</span><div><div className="text-[11px] font-black text-slate-200">{item.name}</div><div className="text-[9px] text-slate-500 font-bold italic">${item.unitPrice ? item.unitPrice + ' USD' : item.areaPrice + ' USD/m²'}</div><div className="text-[8px] text-emerald-400 font-bold uppercase italic">${item.unitPrice ? Math.round(item.unitPrice * USD_TO_SGD) + ' SGD' : Math.round(item.areaPrice * USD_TO_SGD) + ' SGD/m²'}</div></div></div>
-                <Move size={12} className="text-slate-600" />
-              </div>
-            ))}
+            {LIBRARY.VEGETATION.map(item => {
+              const priceSGD = item.unitPrice ? Math.round(item.unitPrice * USD_TO_SGD) : Math.round(item.areaPrice * USD_TO_SGD);
+              const suffix = item.unitPrice ? ' SGD' : ' SGD/m²';
+              return (
+                <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="sketch-border-red flex items-center gap-3 p-2.5 cursor-grab transition-all group hover:-translate-y-px">
+                  <span className="w-10 h-10 flex items-center justify-center text-2xl shrink-0" style={{ color: getDisplayColor(item) }}>{item.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-display font-bold text-ink leading-tight truncate">{item.name}</div>
+                    <div className="text-[12px] font-hand text-brand font-bold">${priceSGD}{suffix}</div>
+                  </div>
+                  <Move size={12} className="text-ink-mute opacity-60 group-hover:opacity-100" />
+                </div>
+              );
+            })}
           </SidebarSection>
 
           <SidebarSection title="Water Features" icon={Waves} id="WATER" isOpen={openSectionIds.includes('WATER')} onToggle={toggleSection}>
-            {LIBRARY.WATER.map(item => (
-              <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-sky-500 transition-all group shadow-sm"><div className="flex items-center gap-3 text-[11px] font-bold text-slate-200 uppercase tracking-tighter"><span className="text-lg">{item.icon}</span> {item.name}</div><Move size={12} className="text-slate-600" /></div>
-            ))}
+            {LIBRARY.WATER.map(item => {
+              const priceSGD = item.unitPrice ? Math.round(item.unitPrice * USD_TO_SGD) : Math.round(item.areaPrice * USD_TO_SGD);
+              const suffix = item.unitPrice ? ' SGD' : ' SGD/m²';
+              return (
+                <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="sketch-border-red flex items-center gap-3 p-2.5 cursor-grab transition-all group hover:-translate-y-px">
+                  <span className="w-10 h-10 flex items-center justify-center text-2xl shrink-0" style={{ color: getDisplayColor(item) }}>{item.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-display font-bold text-ink leading-tight truncate">{item.name}</div>
+                    <div className="text-[12px] font-hand text-brand font-bold">${priceSGD}{suffix}</div>
+                  </div>
+                  <Move size={12} className="text-ink-mute opacity-60 group-hover:opacity-100" />
+                </div>
+              );
+            })}
           </SidebarSection>
 
           <SidebarSection title="Infrastructure" icon={Armchair} id="INFRASTRUCTURE" isOpen={openSectionIds.includes('INFRASTRUCTURE')} onToggle={toggleSection}>
-            {LIBRARY.INFRASTRUCTURE.map(item => (
-              <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-orange-500 transition-all group shadow-sm"><div className="flex items-center gap-3 text-[11px] font-bold text-slate-200 uppercase tracking-tighter"><span className="text-lg">{item.icon}</span> {item.name}</div><Move size={12} className="text-slate-600" /></div>
-            ))}
+            {LIBRARY.INFRASTRUCTURE.map(item => {
+              const priceSGD = item.unitPrice ? Math.round(item.unitPrice * USD_TO_SGD) : Math.round((item.areaPrice || 0) * USD_TO_SGD);
+              const suffix = item.unitPrice ? ' SGD' : ' SGD/m²';
+              return (
+                <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="sketch-border-red flex items-center gap-3 p-2.5 cursor-grab transition-all group hover:-translate-y-px">
+                  <span className="w-10 h-10 flex items-center justify-center text-2xl shrink-0" style={{ color: getDisplayColor(item) }}>{item.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-display font-bold text-ink leading-tight truncate">{item.name}</div>
+                    <div className="text-[12px] font-hand text-brand font-bold">${priceSGD}{suffix}</div>
+                  </div>
+                  <Move size={12} className="text-ink-mute opacity-60 group-hover:opacity-100" />
+                </div>
+              );
+            })}
           </SidebarSection>
 
           <SidebarSection title="Activity Frames" icon={Layout} id="ACTIVITY" isOpen={openSectionIds.includes('ACTIVITY')} onToggle={toggleSection}>
             {LIBRARY.ACTIVITY.map(item => (
-              <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="flex items-center justify-between p-2.5 bg-slate-700/30 border border-slate-600/50 rounded-xl cursor-grab hover:border-indigo-500 transition-all group shadow-sm"><div className="flex items-center gap-3 text-[11px] font-bold text-slate-200 uppercase tracking-tighter"><span className="text-lg">{item.icon}</span> {item.name}</div><Move size={12} className="text-slate-600" /></div>
+              <div key={item.type} draggable onDragStart={(e) => onDragStartSidebar(e, item)} className="sketch-border-red flex items-center gap-3 p-2.5 cursor-grab transition-all group hover:-translate-y-px">
+                <span className="w-10 h-10 flex items-center justify-center text-2xl shrink-0" style={{ color: getDisplayColor(item) }}>{item.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-display font-bold text-ink leading-tight truncate">{item.name}</div>
+                  <div className="text-[11px] font-hand text-ink-soft">Layout frame</div>
+                </div>
+                <Move size={12} className="text-ink-mute opacity-60 group-hover:opacity-100" />
+              </div>
             ))}
           </SidebarSection>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-slate-950">
-        <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-4 px-6 z-10 shadow-xl shrink-0">
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-paper">
+        <header className="h-16 bg-paper-2 border-b-2 border-ink/30 flex items-center justify-between gap-4 px-6 z-10 shrink-0" style={{ boxShadow: '0 2px 0 rgba(42,40,36,0.08)' }}>
           <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center bg-slate-800 rounded-xl p-1 shadow-inner">
-              <button onClick={() => setViewMode('design')} className={`px-5 py-1.5 text-xs font-black rounded-lg transition-all uppercase tracking-tighter ${viewMode === 'design' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Spatial Design</button>
-              <button onClick={() => setViewMode('data')} className={`px-5 py-1.5 text-xs font-black rounded-lg transition-all uppercase tracking-tighter ${viewMode === 'data' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Costing/Technical Data</button>
+            <div className="flex items-center bg-paper rounded-xl p-1 border border-ink/30" style={{ boxShadow: '2px 3px 0 rgba(42,40,36,0.08)' }}>
+              <button onClick={() => setViewMode('design')} className={`px-5 py-1.5 text-[13px] font-display font-bold rounded-lg transition-all ${viewMode === 'design' ? 'bg-brand text-paper shadow' : 'text-ink-soft hover:text-ink'}`}>Spatial Design</button>
+              <button onClick={() => setViewMode('data')} className={`px-5 py-1.5 text-[13px] font-display font-bold rounded-lg transition-all ${viewMode === 'data' ? 'bg-brand text-paper shadow' : 'text-ink-soft hover:text-ink'}`}>Costing/Technical Data</button>
             </div>
-            <div className="flex items-center gap-1 bg-slate-800 rounded-xl p-1 border border-slate-700">
-              <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" className={`p-2 rounded-lg transition-all ${canUndo ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 cursor-not-allowed'}`}><Undo2 size={18} /></button>
-              <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className={`p-2 rounded-lg transition-all ${canRedo ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-600 cursor-not-allowed'}`}><Redo2 size={18} /></button>
+            <div className="flex items-center gap-1 bg-paper rounded-xl p-1 border border-ink/30" style={{ boxShadow: '2px 3px 0 rgba(42,40,36,0.08)' }}>
+              <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" className={`p-2 rounded-lg transition-all ${canUndo ? 'text-ink hover:bg-paper-3 hover:text-brand' : 'text-ink-mute cursor-not-allowed'}`}><Undo2 size={18} /></button>
+              <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className={`p-2 rounded-lg transition-all ${canRedo ? 'text-ink hover:bg-paper-3 hover:text-brand' : 'text-ink-mute cursor-not-allowed'}`}><Redo2 size={18} /></button>
             </div>
           </div>
           <div className="flex-1 min-w-0 flex items-center justify-end gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide">
-            <div className="flex items-center gap-2 bg-slate-800 px-2.5 py-2 rounded-xl border border-slate-700 shrink-0">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest shrink-0">Zoom</span>
-              <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-32 h-1 accent-emerald-500" />
-              <span className="text-xs font-mono font-bold w-9 shrink-0 text-emerald-400">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
+            <div className="flex items-center gap-2 bg-paper px-2.5 py-2 rounded-xl border border-ink/30 shrink-0" style={{ boxShadow: '2px 3px 0 rgba(42,40,36,0.08)' }}>
+              <span className="text-[12px] font-display font-bold text-ink-soft tracking-wide shrink-0">Zoom</span>
+              <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-32 h-1 accent-brand" />
+              <span className="text-xs font-mono font-bold w-9 shrink-0 text-brand">{Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%</span>
             </div>
-            <div className="flex items-center gap-3 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 shrink-0">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Calculator size={12} /> Analysis</span>
-              <div className="flex items-center gap-2.5 text-xs">
+            <div className="flex items-center gap-3 bg-paper px-3 py-2 rounded-xl border border-ink/30 shrink-0" style={{ boxShadow: '2px 3px 0 rgba(42,40,36,0.08)' }}>
+              <span className="text-[12px] font-display font-bold text-ink-soft tracking-wide flex items-center gap-1.5"><Calculator size={13} /> Analysis</span>
+              <div className="flex items-center gap-2.5 text-[13px]">
                 <div className="flex items-center gap-1.5">
-                  <Sun size={12} className="text-amber-400 shrink-0" />
-                  <span className="text-slate-400">Tree coverage</span>
-                  <span className="font-mono font-bold text-white">{analysis.shadeRate.toFixed(1)}%</span>
+                  <Sun size={13} className="text-wash-ochre shrink-0" style={{ filter: 'brightness(0.8)' }} />
+                  <span className="text-ink-soft font-display">Tree coverage</span>
+                  <span className="font-mono font-bold text-ink">{analysis.shadeRate.toFixed(1)}%</span>
                 </div>
-                <div className="w-px h-4 bg-slate-600" />
+                <div className="w-px h-4 bg-ink/30" />
                 <div className="flex items-center gap-1.5">
-                  <DollarSign size={12} className="text-emerald-500 shrink-0" />
-                  <span className="text-slate-400">Budget</span>
-                  <span className="font-mono font-bold text-emerald-400">${analysis.costSGD.toLocaleString()}</span>
+                  <DollarSign size={13} className="text-brand shrink-0" />
+                  <span className="text-ink-soft font-display">Budget</span>
+                  <span className="font-mono font-bold text-brand">${analysis.costSGD.toLocaleString()}</span>
                 </div>
-                <div className="w-px h-4 bg-slate-600" />
-                <span className={`text-[10px] font-bold shrink-0 ${canSubmit ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <div className="w-px h-4 bg-ink/30" />
+                <span className={`text-[11px] font-display font-bold shrink-0 ${canSubmit ? 'text-brand' : 'text-brand-deep'}`}>
                   {canSubmit ? '55k–80k ✓' : overCap ? 'Over 80k' : 'Below 55k'}
                 </span>
               </div>
@@ -1485,7 +1532,7 @@ const App = () => {
               {showExportButtons && (
                 <button
                   onClick={downloadJson}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 bg-emerald-600 text-white hover:bg-emerald-500"
+                  className="sketch-btn flex items-center gap-2 px-4 py-2.5 font-display font-bold text-sm active:scale-95"
                 >
                   <Download size={16} /> Download JSON
                 </button>
@@ -1494,9 +1541,7 @@ const App = () => {
                 onClick={() => canSubmit && !isExporting ? setShowFeedbackModal(true) : submitToTeacher()}
                 disabled={isExporting || !canSubmit}
                 title={!canSubmit ? (overCap ? 'Budget must not exceed 80,000 SGD' : underMin ? 'Budget must be at least 55,000 SGD' : 'Submit allowed only when budget is between 55k and 80k SGD') : ''}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 ${
-                  isExporting ? 'bg-sky-600/50 text-white/50 cursor-not-allowed' : !canSubmit ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-sky-600 text-white hover:bg-sky-500'
-                }`}
+                className={`sketch-btn-brand flex items-center gap-2 px-4 py-2.5 font-display font-bold text-sm active:scale-95 ${(isExporting || !canSubmit) ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <Download size={16} /> {isExporting ? 'Submitting…' : canSubmit ? 'Submit' : 'Cannot submit'}
               </button>
@@ -1504,20 +1549,18 @@ const App = () => {
                 <button
                   onClick={exportData}
                   disabled={isExporting}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 border border-slate-600 ${
-                    isExporting ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
+                  className={`sketch-btn flex items-center gap-2 px-4 py-2.5 font-display font-bold text-sm active:scale-95 ${isExporting ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <Download size={16} /> Upload to Google Drive
                 </button>
               )}
               {uploadStatus && (
-                <div className={`px-4 py-2 rounded-xl text-xs font-bold ${
+                <div className={`px-4 py-2 rounded-xl text-xs font-bold border ${
                   (uploadStatus.includes('success') || uploadStatus.includes('Successfully') || uploadStatus.includes('Downloaded') || uploadStatus.includes('Uploaded'))
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                    ? 'bg-wash-green/40 text-ink border-ink/40'
                     : (uploadStatus.includes('fail') || uploadStatus.includes('Error'))
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    ? 'bg-brand/15 text-brand-deep border-brand/40'
+                    : 'bg-wash-blue/40 text-ink border-ink/40'
                 }`}>
                   {uploadStatus}
                 </div>
@@ -1527,36 +1570,40 @@ const App = () => {
         </header>
 
         <div className="flex-1 flex min-h-0">
-          <div ref={viewportRef} className="flex-1 min-w-0 overflow-auto bg-[#0a0a0a] relative scrollbar-hide">
+          <div ref={viewportRef} className="flex-1 min-w-0 overflow-auto bg-paper-3 relative scrollbar-hide">
           {viewMode === 'design' ? (
             <div className="flex items-center justify-center min-w-full min-h-full" style={{ padding: '800px' }}>
-              <div 
+              <div
                 ref={canvasRef} onDrop={onDropSidebarToCanvas} onDragOver={(e) => e.preventDefault()} onMouseDown={handleMapMouseDown}
-                className={`relative shadow-[0_0_150px_rgba(0,0,0,0.8)] transition-transform origin-center flex-shrink-0 ${!mapConfig.isLocked && baseMap ? 'cursor-move ring-2 ring-emerald-500/50' : ''}`}
+                className={`relative transition-transform origin-center flex-shrink-0 ${!mapConfig.isLocked && baseMap ? 'cursor-move ring-2 ring-brand/50' : ''}`}
                 style={{
                   width: canvasPixelWidth, height: canvasPixelHeight, transform: `scale(${zoom})`,
-                  backgroundColor: '#111827', backgroundImage: `linear-gradient(#1f2937 1px, transparent 1px), linear-gradient(90deg, #1f2937 1px, transparent 1px)`,
-                  backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`, border: '1px solid #374151'
+                  backgroundColor: '#faf6ec',
+                  backgroundImage: `linear-gradient(rgba(140,123,95,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(140,123,95,0.18) 1px, transparent 1px)`,
+                  backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                  border: '2px solid #2a2824',
+                  borderRadius: '4px',
+                  boxShadow: '4px 6px 0 rgba(42,40,36,0.18), 0 0 0 1px rgba(42,40,36,0.08)',
                 }}
               >
                 {/* 画布内小型 Zoom 控件（方案三）——紧贴画布左下角 */}
                 <div className="pointer-events-none absolute bottom-4 left-4 z-[60]">
-                  <div className="pointer-events-auto flex items-center gap-1.5 bg-emerald-600/90 border border-emerald-400 rounded-xl px-3 py-1.5 shadow-lg">
+                  <div className="pointer-events-auto flex items-center gap-1 bg-paper border-[1.5px] border-ink rounded-xl px-2 py-1" style={{ boxShadow: '2px 3px 0 rgba(42,40,36,0.18)' }}>
                     <button
                       type="button"
                       onClick={() => setZoom(prev => Math.max(ZOOM_MIN, prev - (ZOOM_MAX - ZOOM_MIN) * 0.06))}
-                      className="w-6 h-6 flex items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-500 text-white text-xs font-black"
+                      className="w-6 h-6 flex items-center justify-center rounded-md text-ink hover:bg-brand hover:text-paper text-base font-bold font-display"
                       title="Zoom out"
                     >
-                      -
+                      −
                     </button>
-                    <div className="px-1 text-[11px] font-mono text-white w-14 text-center">
+                    <div className="px-1 text-[12px] font-mono text-ink w-12 text-center">
                       {Math.round((zoom - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN) * 90 + 10)}%
                     </div>
                     <button
                       type="button"
                       onClick={() => setZoom(prev => Math.min(ZOOM_MAX, prev + (ZOOM_MAX - ZOOM_MIN) * 0.06))}
-                      className="w-6 h-6 flex items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-500 text-white text-xs font-black"
+                      className="w-6 h-6 flex items-center justify-center rounded-md text-ink hover:bg-brand hover:text-paper text-base font-bold font-display"
                       title="Zoom in"
                     >
                       +
@@ -1581,7 +1628,7 @@ const App = () => {
                 
                 {boxSelect && (
                   <div
-                    className="absolute border-2 border-emerald-400 bg-emerald-500/10 pointer-events-none z-[25]"
+                    className="absolute border-2 border-brand bg-brand/10 pointer-events-none z-[25]"
                     style={{
                       left: Math.min(boxSelect.startX, boxSelect.currentX),
                       top: Math.min(boxSelect.startY, boxSelect.currentY),
@@ -1602,39 +1649,41 @@ const App = () => {
                   // 多边形/有机形/L 形：div 按形状左上角定位，不设 clipPath 以便工具栏可见
                   const renderX = isPoly ? el.x + polyMin.x : el.x;
                   const renderY = isPoly ? el.y + polyMin.y : el.y;
+                  const displayColor = getDisplayColor(el);
                   return (
                     <div
                       key={el.id}
                       onMouseDown={(e) => handleEntityMouseDown(e, el)}
-                      className={`absolute flex items-center justify-center group pointer-events-auto ${isSelected ? 'z-50 ring-2 ring-emerald-500 ring-offset-4 ring-offset-slate-950 scale-[1.01]' : 'z-30 hover:brightness-125'} ${isDragging ? 'cursor-grabbing opacity-70' : 'cursor-grab'}`}
+                      className={`absolute flex items-center justify-center group pointer-events-auto ${isSelected ? 'z-50 ring-2 ring-brand ring-offset-4 ring-offset-paper scale-[1.01]' : 'z-30 hover:brightness-105'} ${isDragging ? 'cursor-grabbing opacity-70' : 'cursor-grab'}`}
                       style={{
-                        left: renderX * GRID_SIZE, top: renderY * GRID_SIZE, 
+                        left: renderX * GRID_SIZE, top: renderY * GRID_SIZE,
                         width: el.width * GRID_SIZE, height: el.height * GRID_SIZE,
-                        backgroundColor: isPoly ? 'transparent' : el.color + (isSelected ? '99' : '55'), 
-                        border: isPoly ? 'none' : `2px solid ${el.color}`,
-                        borderRadius: el.shape === 'circle' ? '50%' : '6px', 
+                        backgroundColor: isPoly ? 'transparent' : displayColor + (isSelected ? 'cc' : '99'),
+                        border: isPoly ? 'none' : `2px solid #2a2824`,
+                        borderRadius: el.shape === 'circle' ? '50%' : '4px',
                         transform: `rotate(${el.rotation}deg)`, transformOrigin: 'center center',
+                        filter: isPoly ? undefined : 'url(#rough-soft)',
                       }}
                     >
                       {isPoly && displayVertices && (
                         <svg className="absolute inset-0 w-full h-full overflow-visible pointer-events-none" style={{ transform: `translate(${-polyMin.x * GRID_SIZE}px, ${-polyMin.y * GRID_SIZE}px)` }}>
                           {el.shape === 'organic' ? (
-                            <path d={getOrganicPath(el.vertices)} fill={el.color + (isSelected ? '99' : '55')} stroke={el.color} strokeWidth="2" />
+                            <path d={getOrganicPath(el.vertices)} fill={displayColor + (isSelected ? 'cc' : 'aa')} stroke="#2a2824" strokeWidth="2" filter="url(#rough-soft)" />
                           ) : (
-                            <polygon points={displayVertices.map(v => `${v.x * GRID_SIZE},${v.y * GRID_SIZE}`).join(' ')} fill={el.color + (isSelected ? '99' : '55')} stroke={el.color} strokeWidth="2" />
+                            <polygon points={displayVertices.map(v => `${v.x * GRID_SIZE},${v.y * GRID_SIZE}`).join(' ')} fill={displayColor + (isSelected ? 'cc' : 'aa')} stroke="#2a2824" strokeWidth="2" filter="url(#rough-soft)" />
                           )}
                         </svg>
                       )}
 
                       {isSelected && selectedIds.length === 1 && (
                         <div
-                          className="absolute -top-20 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-900 shadow-2xl rounded-2xl px-3 py-2 border border-emerald-500/60 ring-1 ring-emerald-400/50 z-[70]"
-                          style={{ transform: `rotate(${-el.rotation}deg) scale(2)` }}
+                          className="absolute -top-20 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-paper rounded-xl px-2 py-1.5 border-[1.5px] border-ink z-[70]"
+                          style={{ transform: `rotate(${-el.rotation}deg) scale(2)`, boxShadow: '2px 3px 0 rgba(42,40,36,0.22)' }}
                           onMouseDown={e => e.stopPropagation()}
                         >
                           <button
                             onClick={() => duplicateElement(el.id)}
-                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                            className="flex items-center justify-center p-1.5 rounded-md text-ink hover:bg-brand hover:text-paper transition-all"
                             title="Duplicate"
                           >
                             <Copy size={18} />
@@ -1642,7 +1691,7 @@ const App = () => {
                           {isPoly && (
                             <button
                               onClick={() => addVertex(el.id)}
-                              className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                              className="flex items-center justify-center p-1.5 rounded-md text-ink hover:bg-brand hover:text-paper transition-all"
                               title="Add Vertex"
                             >
                               <PlusCircle size={18} />
@@ -1650,14 +1699,14 @@ const App = () => {
                           )}
                           <button
                             onClick={() => rotateElement(el.id, -15)}
-                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                            className="flex items-center justify-center p-1.5 rounded-md text-ink hover:bg-brand hover:text-paper transition-all"
                             title="Rotate Left"
                           >
                             <RotateCcw size={18} />
                           </button>
                           <button
                             onClick={() => rotateElement(el.id, 15)}
-                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-slate-100 hover:bg-emerald-600 hover:text-white transition-all"
+                            className="flex items-center justify-center p-1.5 rounded-md text-ink hover:bg-brand hover:text-paper transition-all"
                             title="Rotate Right"
                           >
                             <RotateCw size={18} />
@@ -1671,7 +1720,7 @@ const App = () => {
                               });
                               setSelectedIds([]);
                             }}
-                            className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                            className="flex items-center justify-center p-1.5 rounded-md text-brand hover:bg-brand hover:text-paper transition-all"
                             title="Delete"
                           >
                             <Trash size={18} />
@@ -1680,18 +1729,18 @@ const App = () => {
                       )}
 
                       {isSelected && selectedIds.length === 1 && isPoly && el.vertices && el.vertices.map((v, idx) => (
-                        <div key={idx} onMouseDown={(e) => handleVertexMouseDown(e, el.id, idx)} className="absolute w-3 h-3 bg-white border-2 border-emerald-500 rounded-full cursor-crosshair z-[80] shadow-lg hover:scale-125 transition-transform" style={{ left: (v.x - polyMin.x) * GRID_SIZE, top: (v.y - polyMin.y) * GRID_SIZE, transform: 'translate(-50%, -50%)' }} />
+                        <div key={idx} onMouseDown={(e) => handleVertexMouseDown(e, el.id, idx)} className="absolute w-3 h-3 bg-paper border-2 border-ink rounded-full cursor-crosshair z-[80] hover:scale-125 transition-transform" style={{ left: (v.x - polyMin.x) * GRID_SIZE, top: (v.y - polyMin.y) * GRID_SIZE, transform: 'translate(-50%, -50%)' }} />
                       ))}
 
                       {isSelected && selectedIds.length === 1 && (
                         <>
-                          <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'rb')} className="absolute -right-2 -bottom-2 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full cursor-nwse-resize z-[60] shadow-md hover:scale-125 transition-transform" />
+                          <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'rb')} className="absolute -right-2 -bottom-2 w-4 h-4 bg-brand border-2 border-ink rounded-full cursor-nwse-resize z-[60] hover:scale-125 transition-transform" />
                           {!el.aspectLocked && (
                             <>
-                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'l')} className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-6 bg-emerald-500 border border-white rounded cursor-ew-resize z-[60] opacity-80 hover:opacity-100" />
-                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'r')} className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-6 bg-emerald-500 border border-white rounded cursor-ew-resize z-[60] opacity-80 hover:opacity-100" />
-                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 't')} className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-6 h-3 bg-emerald-500 border border-white rounded cursor-ns-resize z-[60] opacity-80 hover:opacity-100" />
-                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'b')} className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-3 bg-emerald-500 border border-white rounded cursor-ns-resize z-[60] opacity-80 hover:opacity-100" />
+                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'l')} className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-6 bg-brand border border-ink rounded cursor-ew-resize z-[60] opacity-80 hover:opacity-100" />
+                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'r')} className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-6 bg-brand border border-ink rounded cursor-ew-resize z-[60] opacity-80 hover:opacity-100" />
+                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 't')} className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-6 h-3 bg-brand border border-ink rounded cursor-ns-resize z-[60] opacity-80 hover:opacity-100" />
+                              <div onMouseDown={(e) => handleResizeMouseDown(e, el, 'b')} className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-3 bg-brand border border-ink rounded cursor-ns-resize z-[60] opacity-80 hover:opacity-100" />
                             </>
                           )}
                         </>
@@ -1705,41 +1754,41 @@ const App = () => {
               </div>
             </div>
           ) : (
-            <div className="w-full h-full bg-slate-950 overflow-y-auto p-12 flex justify-center">
-              <div className="w-full max-w-7xl bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-800 h-fit">
-                <div className="p-10 border-b border-slate-800 flex bg-slate-900/50 justify-between items-center">
-                  <h3 className="font-black text-emerald-400 text-2xl uppercase tracking-tighter">Costing/Technical Data</h3>
-                  <div className="text-2xl font-black text-emerald-500">${analysis.costSGD.toLocaleString()} SGD Total</div>
+            <div className="w-full h-full bg-paper overflow-y-auto p-12 flex justify-center">
+              <div className="w-full max-w-7xl bg-paper-2 rounded-2xl overflow-hidden border-2 border-ink/40 h-fit" style={{ boxShadow: '4px 6px 0 rgba(42,40,36,0.12)' }}>
+                <div className="p-8 border-b-2 border-ink/30 flex bg-paper justify-between items-center">
+                  <h3 className="font-display font-bold text-ink text-3xl tracking-tight">Costing / Technical Data</h3>
+                  <div className="text-2xl font-display font-bold text-brand">${analysis.costSGD.toLocaleString()} SGD Total</div>
                 </div>
                 <div className="p-0">
                   <table className="w-full text-left">
-                    <thead className="sticky top-0 bg-slate-800 z-10 shadow-lg">
-                      <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-700">
+                    <thead className="sticky top-0 bg-paper-3 z-10">
+                      <tr className="text-[12px] font-display font-bold text-ink-soft border-b-2 border-ink/30">
                         <th className="px-10 py-5">Object</th>
                         <th className="px-10 py-5">X/Y Coord (m)</th>
                         <th className="px-10 py-5">Area/Dim (m)</th>
                         <th className="px-10 py-5">Rotation</th>
-                        <th className="px-10 py-5 text-emerald-400">Est. Cost (SGD)</th>
-                        <th className="px-10 py-5 text-slate-600">ID</th>
+                        <th className="px-10 py-5 text-brand">Est. Cost (SGD)</th>
+                        <th className="px-10 py-5 text-ink-mute">ID</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/50">
+                    <tbody className="divide-y divide-ink/15">
                       {placedElements.map(el => {
                         const area = (el.shape === 'polygon' || el.shape === 'organic') ? calculatePolygonArea(el.vertices) : (el.width * el.height);
                         const cost = (el.unitPrice || (el.areaPrice * area)) * USD_TO_SGD;
                         return (
-                          <tr key={el.id} className="text-sm border-slate-800/50 hover:bg-emerald-500/5 transition-colors">
-                            <td className="px-10 py-6 font-black flex items-center gap-4 text-slate-200"><span className="text-2xl drop-shadow-sm">{el.icon}</span> {el.name}</td>
-                            <td className="px-10 py-6 font-mono text-emerald-400">{el.x.toFixed(1)} / {el.y.toFixed(1)}</td>
-                            <td className="px-10 py-6 font-mono text-slate-50">{el.shape === 'polygon' || el.shape === 'organic' ? `${area.toFixed(1)}m²` : `${el.width.toFixed(1)} × ${el.height.toFixed(1)}`}</td>
-                            <td className="px-10 py-6 font-mono text-amber-500 font-bold">{el.rotation}°</td>
-                            <td className="px-10 py-6 font-mono text-emerald-400 font-bold">${cost.toLocaleString()}</td>
-                            <td className="px-10 py-6 font-mono text-[9px] text-slate-600 uppercase italic font-bold">...{el.id.slice(-6)}</td>
+                          <tr key={el.id} className="text-sm hover:bg-brand/5 transition-colors">
+                            <td className="px-10 py-5 font-display font-bold flex items-center gap-4 text-ink"><span className="text-2xl">{el.icon}</span> {el.name}</td>
+                            <td className="px-10 py-5 font-mono text-ink-soft">{el.x.toFixed(1)} / {el.y.toFixed(1)}</td>
+                            <td className="px-10 py-5 font-mono text-ink">{el.shape === 'polygon' || el.shape === 'organic' ? `${area.toFixed(1)}m²` : `${el.width.toFixed(1)} × ${el.height.toFixed(1)}`}</td>
+                            <td className="px-10 py-5 font-mono text-ink-soft">{el.rotation}°</td>
+                            <td className="px-10 py-5 font-mono text-brand font-bold">${cost.toLocaleString()}</td>
+                            <td className="px-10 py-5 font-mono text-[10px] text-ink-mute italic">...{el.id.slice(-6)}</td>
                           </tr>
                         );
                       })}
                       {placedElements.length === 0 && (
-                        <tr><td colSpan="6" className="px-10 py-32 text-center text-slate-500 italic uppercase font-black tracking-widest opacity-30">Register is empty. Placement required.</td></tr>
+                        <tr><td colSpan="6" className="px-10 py-32 text-center text-ink-soft italic font-hand text-xl opacity-60">Register is empty. Placement required.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1758,12 +1807,12 @@ const App = () => {
                 previewResizeStartRef.current = { startX: e.clientX, startW: previewPanelWidth };
                 setPreviewResize({ active: true, startX: e.clientX, startW: previewPanelWidth });
               }}
-              className={`flex-shrink-0 w-1.5 flex flex-col items-center justify-center border-l border-r border-slate-700 bg-slate-800 hover:bg-emerald-500/30 cursor-ew-resize transition-colors ${previewResize.active ? 'bg-emerald-500/40' : ''}`}
+              className={`flex-shrink-0 w-1.5 flex flex-col items-center justify-center border-l border-r border-ink/25 bg-paper-3 hover:bg-brand/30 cursor-ew-resize transition-colors ${previewResize.active ? 'bg-brand/40' : ''}`}
             >
-              <div className="w-0.5 h-8 rounded-full bg-slate-500 pointer-events-none" />
+              <div className="w-0.5 h-8 rounded-full bg-ink/50 pointer-events-none" />
             </div>
-            <aside style={{ width: previewPanelWidth }} className="flex-shrink-0 border-l border-slate-800 bg-slate-900/80 flex flex-col p-3">
-              <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">3D Preview</div>
+            <aside style={{ width: previewPanelWidth }} className="flex-shrink-0 border-l border-ink/20 bg-paper flex flex-col p-3">
+              <div className="text-sm font-display font-bold text-ink mb-2 tracking-wide">3D Preview</div>
               <div className="flex-1 min-h-0 min-w-0">
                 <Preview3D elements={placedElements} canvasMetersW={canvasMetersW} canvasMetersH={canvasMetersH} />
               </div>
@@ -1772,21 +1821,21 @@ const App = () => {
         )}
         </div>
 
-        <footer className="min-h-12 bg-slate-900 border-t border-slate-800 px-8 flex flex-col text-[10px] text-slate-500 font-black uppercase tracking-widest">
+        <footer className="min-h-12 bg-paper-2 border-t-2 border-ink/30 px-8 flex flex-col text-[12px] text-ink-soft font-display font-bold">
           <div className="h-12 flex items-center justify-between">
-            <div className="flex gap-8 items-center">
-              <span className="flex items-center gap-2 font-bold text-emerald-500"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Engine v0.5.1</span>
-              <span className="text-slate-400">Fixed: Market-Adjusted Prices & Budget Sync</span>
+            <div className="flex gap-6 items-center">
+              <span className="flex items-center gap-2 text-brand"><div className="w-2 h-2 rounded-full bg-brand animate-pulse"></div> Engine v0.5.1</span>
+              <span className="text-ink-soft hidden md:inline font-hand text-[13px]">Market-Adjusted Prices &amp; Budget Sync</span>
             </div>
-            <div className="flex gap-6 items-center text-slate-400 italic">
-              <div className="flex items-center gap-1.5 font-bold text-emerald-400"><Calculator size={12}/> Calculations Unified</div>
-              <div className="h-4 w-px bg-slate-800"></div>
-              <span className="text-emerald-500/50 font-bold uppercase tracking-tighter">100m² Perspective</span>
-              <div className="h-4 w-px bg-slate-800"></div>
+            <div className="flex gap-4 items-center text-ink-soft">
+              <div className="flex items-center gap-1.5 text-brand"><Calculator size={13}/> Calculations Unified</div>
+              <div className="h-4 w-px bg-ink/25"></div>
+              <span className="text-ink-soft font-hand text-[13px]">100 m² perspective</span>
+              <div className="h-4 w-px bg-ink/25"></div>
               <button
                 type="button"
                 onClick={() => setFooterShortcutsOpen((v) => !v)}
-                className="flex items-center gap-1.5 text-slate-500 hover:text-emerald-400 transition-colors"
+                className="flex items-center gap-1.5 text-ink-soft hover:text-brand transition-colors"
               >
                 {footerShortcutsOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 <span>Shortcuts</span>
@@ -1794,8 +1843,8 @@ const App = () => {
             </div>
           </div>
           {footerShortcutsOpen && (
-            <div className="pb-3 pt-0.5 border-t border-slate-800/80 text-[9px] text-slate-500 font-bold uppercase tracking-wider">
-              <span className="text-slate-400">Keyboard:</span> Ctrl+Z Undo · Ctrl+Y Redo · Ctrl+C Copy · Ctrl+V Paste (select component first)
+            <div className="pb-3 pt-0.5 border-t border-ink/20 text-[13px] text-ink-soft font-hand">
+              <span className="text-brand font-display font-bold">Keyboard:</span> Ctrl+Z Undo · Ctrl+Y Redo · Ctrl+C Copy · Ctrl+V Paste (select component first)
             </div>
           )}
         </footer>
